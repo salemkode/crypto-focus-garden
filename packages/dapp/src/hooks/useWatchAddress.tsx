@@ -1,53 +1,71 @@
-import { UtxoI, Wallet } from "mainnet-js";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { TestNetWallet as Wallet } from "mainnet-js";
+import { useEffect } from "react";
 
 export function useWatchAddress(address?: string, tokenId?: string) {
-  const [utxos, setUtxos] = useState<UtxoI[] | undefined>(undefined);
-  const [tokenUtxos, setTokenUtxos] = useState<UtxoI[] | undefined>(undefined);
-  const [balance, setBalance] = useState<number | undefined>(undefined);
-  const [tokenBalance, setTokenBalance] = useState<bigint | undefined>(undefined);
-  const [retries, setRetries] = useState(0);
+	const { data: wallet } = useQuery({
+		queryKey: ["watchAddress", address],
+		queryFn: async () => {
+			if (!address) return null;
+			return await Wallet.watchOnly(address);
+		},
+		enabled: !!address,
+	});
+	const {
+		data: { balance, utxos, tokenUtxos, tokenBalance },
+		refetch,
+	} = useQuery({
+		initialData: {
+			utxos: [],
+			balance: 0,
+			tokenUtxos: [],
+			tokenBalance: 0n,
+		},
+		queryKey: ["watchAddress", address, tokenId],
+		queryFn: async () => {
+			if (!wallet)
+				return {
+					utxos: [],
+					balance: 0,
+					tokenUtxos: [],
+					tokenBalance: 0n,
+				};
+			const utxos = await wallet.getUtxos();
+			const balance = utxos.reduce(
+				(acc, utxo) => acc + (utxo.token ? 0 : utxo.satoshis),
+				0,
+			);
+			return {
+				utxos,
+				balance,
+				tokenBalance: utxos.reduce(
+					(acc, utxo) =>
+						acc +
+						(utxo.token?.tokenId === tokenId ? (utxo.token?.amount ?? 0n) : 0n),
+					0n,
+				),
+				tokenUtxos: tokenId
+					? utxos.filter((utxo) => utxo.token?.tokenId === tokenId)
+					: utxos,
+			};
+		},
+		enabled: !!address,
+		refetchInterval: 10000, // Poll every 10 seconds
+	});
 
-  useEffect(() => {
-    if (!address) {
-      return;
-    }
+	useEffect(() => {
+		if (!address || !wallet) {
+			return;
+		}
 
-    let cancelWatch: () => void;
+		const cancelWatch = wallet.provider.subscribeToAddress(address, () =>
+			refetch(),
+		);
 
-    (async () => {
-      const wallet = await Wallet.watchOnly(address);
+		return () => {
+			cancelWatch.then((remove) => remove());
+		};
+	}, [address, wallet, refetch]);
 
-      const callback = async () => {
-        try {
-          const utxos = await wallet.getUtxos();
-          const balance = utxos.reduce((acc, utxo) => acc + (utxo.token ? 0 : utxo.satoshis), 0);
-          if (tokenId) {
-            const tokenBalance = utxos.reduce((acc, utxo) => acc + (utxo.token?.tokenId === tokenId ? utxo.token!.amount : 0n), 0n);
-            setTokenBalance(tokenBalance);
-          }
-
-          setTokenUtxos(tokenId ? utxos.filter(utxo => utxo.token?.tokenId === tokenId) : utxos);
-          setUtxos(utxos);
-          setBalance(balance);
-        } catch {
-          setRetries((prev) => prev + 1);
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-        }
-      };
-
-      try {
-        cancelWatch = await wallet.provider.subscribeToAddress(address, callback);
-      } catch {
-        setRetries((prev) => prev + 1);
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      };
-    })();
-
-    return () => {
-      cancelWatch?.();
-    };
-  }, [address, retries, tokenId]);
-
-  return { balance, tokenBalance, utxos, tokenUtxos };
+	return { balance, tokenBalance, utxos, tokenUtxos };
 }

@@ -1,8 +1,14 @@
-// P2PKH wrapped in P2SH
-contract P2PKH(bytes20 pkh) {
-    // Require pk to match stored pkh and signature to match
-    function spend(pubkey pk, sig s) {
-        require(hash160(pk) == pkh);
-        require(checkSig(s, pk));
+pragma cashscript ^0.12.0;
+
+contract PomodoroRewardPool(
+    pubkey manager,
+) {
+
+    function Mint(sig managerSig) {
+        require(checkSig(managerSig, manager));
+    }
+
+    function lockSession() {
+        require(true);
     }
 }

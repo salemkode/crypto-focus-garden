@@ -1,32 +1,30 @@
-import type { IConnector } from '@bch-wc2/interfaces';
+import type { IConnector } from "@bch-wc2/interfaces";
 import { P2PKH } from "@dapp-starter/contracts";
+import { useQuery } from "@tanstack/react-query";
 import { ElectrumNetworkProvider } from "cashscript";
 import { Wallet } from "mainnet-js";
-import { useEffect, useState } from "react";
 
 export function useP2PKHContract(address?: string, connector?: IConnector) {
-  const [p2pkh, setP2pkh] = useState<P2PKH>();
+	const { data: p2pkh } = useQuery({
+		queryKey: ["p2pkh", address], // Connector usually implies address change
+		queryFn: async () => {
+			if (!address || !connector) return undefined;
 
-  useEffect(() => {
-    if (!address || !connector) {
-      return;
-    }
+			const wallet = await Wallet.watchOnly(address);
+			const provider = new ElectrumNetworkProvider(undefined, {
+				electrum: wallet.provider.electrum,
+				manualConnectionManagement: true,
+			});
 
-    (async () => {
-      const wallet = await Wallet.watchOnly(address);
-      const provider = new ElectrumNetworkProvider(undefined, {
-        electrum: wallet.provider.electrum,
-        manualConnectionManagement: true,
-      });
+			return new P2PKH({
+				wallet: wallet,
+				provider: provider,
+				connector: connector,
+			});
+		},
+		enabled: !!address && !!connector,
+		staleTime: Infinity, // Contract instance shouldn't change unless address/connector changes
+	});
 
-      const p2pkh = new P2PKH({
-        wallet: wallet,
-        provider: provider,
-        connector: connector,
-      });
-      setP2pkh(p2pkh);
-    })();
-  }, [address, connector]);
-
-  return { p2pkh, P2PKH };
+	return { p2pkh, P2PKH };
 }
