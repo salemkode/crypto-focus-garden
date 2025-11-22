@@ -39,8 +39,7 @@ export class PomodoroRewards {
 			provider,
 			connector,
 			contract,
-			categoryId:
-				"6B13B9FC6A7AE4407CF48730DE84515F84BEC87AF114C9EC25273A92DC086E83",
+			categoryId,
 		});
 	}
 
@@ -65,7 +64,7 @@ export class PomodoroRewards {
 			contract ??
 			new Contract<typeof PomodoroRewardsArtifact>(
 				PomodoroRewardsArtifact,
-				[changeEndianness(categoryId), 1500n],
+				[changeEndianness(categoryId)],
 				{
 					provider,
 					addressType: "p2sh20",

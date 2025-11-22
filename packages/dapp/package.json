@@ -10,6 +10,7 @@
 	},
 	"dependencies": {
 		"@bch-wc2/interfaces": "^0.0.16",
+		"@bch-wc2/mainnet-js-signer": "^0.0.16",
 		"@bch-wc2/web3modal-connector": "^0.0.16",
 		"@dapp-starter/contracts": "workspace:*",
 		"@mainnet-cash/bcmr": "^2.7.24",

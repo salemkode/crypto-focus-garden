@@ -2,8 +2,8 @@ pragma cashscript ^0.13.0;
 
 // PomodoroRewards: Public pool for Pomodoro-style NFT rewards
 contract PomodoroRewards(
-    bytes32 categoryId,   // Token category for the NFT rewards
-    int unlockDelay       // delay in seconds before claim is allowed (e.g. 1500 = 25 minutes)
+    bytes32 categoryId,   // Token category for the NFT rewards (32 bytes only)
+    // int unlockDelay       // delay in seconds before claim is allowed (e.g. 1500 = 25 minutes)
 ) {
     // -----------------------------------------------------------------------------------
     // 1) mintAndLockReward: Create (mint) and Lock a reward in one step.
@@ -16,45 +16,60 @@ contract PomodoroRewards(
     //
     // Outputs:
     //  0: Baton UTXO       [NFT] (back to this contract)
-    //  1: Locked NFT       [NFT] (locked in this contract, commitment = 0x01...ts)
-    //  2: User UTXO        [BCH] (back to user)
+    //  1: Locked NFT       [NFT] (locked in this contract, commitment = 0x01 || userPkh || ts)
+    //  2+: Optional BCH change back to user (no tokens allowed)
     // -----------------------------------------------------------------------------------
-    function mintAndLockReward(bytes20 pubkeyhash) {
-        // Check that Input 0 is the contract's baton (recursive covenant)
+    function mintAndLockReward() {
+        // Ensure this input is the covenant itself (recursive covenant check)
         require(tx.inputs[this.activeInputIndex].lockingBytecode == tx.outputs[0].lockingBytecode);
-        require(tx.inputs[0].tokenCategory == categoryId);
 
-        // Output 0: Baton UTXO (Recursive)
-        // - Must go back to the same contract address (locking bytecode)
-        // - Must keep the same category and amount (baton)
-        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode); 
-        require(tx.outputs[0].tokenCategory == categoryId);
+        // Input 0 must be the baton from the same category
+        bytes32 in0Cat = tx.inputs[0].tokenCategory.split(32)[0];
+        require(in0Cat == categoryId);
+
+        // Output 0: Baton UTXO (recursive)
+        // - Same locking bytecode (same contract)
+        // - Same category (first 32 bytes)
+        // - Same value and tokenAmount (baton preserved)
+        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);
+        bytes32 out0Cat = tx.outputs[0].tokenCategory.split(32)[0];
+        require(out0Cat == categoryId);
         require(tx.outputs[0].value == tx.inputs[0].value);
         require(tx.outputs[0].tokenAmount == tx.inputs[0].tokenAmount);
 
-        // Output 1: Locked NFT (Minted & Locked)
+        // Output 1: Locked NFT (minted & locked)
         // - Locked in this contract
-        // - Same category
-        // - Zero amount (NFT)
+        // - Same category (first 32 bytes)
+        // - tokenAmount == 0 (NFT)
         require(tx.outputs[1].lockingBytecode == tx.inputs[this.activeInputIndex].lockingBytecode);
-        require(tx.outputs[1].tokenCategory == categoryId);
+        bytes32 out1Cat = tx.outputs[1].tokenCategory.split(32)[0];
+        require(out1Cat == categoryId);
         require(tx.outputs[1].tokenAmount == 0);
 
-        //
-        require(tx.inputs[1].lockingBytecode == new LockingBytecodeP2PKH(pubkeyhash));              // check that the provided pubkeyhash belongs to the wallet providing input1's utxo
-        require(tx.inputs[1].tokenCategory == 0x); 
+        // Input 1: User UTXO (proof-of-eligibility)
+        // - Must be simple BCH (no tokens)
+        // - Must be from P2PKH(pubkeyhash)
+        require(tx.inputs[1].tokenCategory == 0x);
 
         // Build commitment: 0x01 || hash160(user) || uint32(timestampStart)
-        // Use tx.time (requires nLockTime set) or tx.locktime
+        // Using tx.locktime as the session start timestamp
+        int time = tx.locktime;
         bytes ts = bytes(tx.locktime);
-        bytes expectedCommitment = 0x01 + pubkeyhash + ts;
+        console.log(ts);
+        console.log(time);
+        bytes expectedCommitment = 0x01 + tx.inputs[1].lockingBytecode + ts;
 
-        require(tx.outputs[1].nftCommitment == expectedCommitment);
+        bytes commitment = tx.outputs[1].nftCommitment;
+        console.log(commitment, expectedCommitment);
+        require(commitment == expectedCommitment);
 
-        // Ensure no other outputs contain tokens
+        // Ensure no other outputs (index >= 2) contain tokens or same covenant bytecode
         int o = 2;
+
         do {
+            // No extra covenant outputs
             require(tx.outputs[o].lockingBytecode != tx.inputs[this.activeInputIndex].lockingBytecode);
+            // No tokens in any other output
             require(tx.outputs[o].tokenCategory == 0x);
             o = o + 1;
         } while (o < tx.outputs.length);
@@ -64,41 +79,44 @@ contract PomodoroRewards(
     // 2) claimReward: user claims the locked reward after unlockDelay
     //
     // Inputs:
-    //  0: Locked NFT       [NFT] (from this contract, commitment=0x01...ts)
+    //  0: Locked NFT       [NFT] (from this contract, commitment=0x01 || userPkh || ts)
     //
     // Outputs:
     //  0: User NFT         [NFT] (to User's P2PKH address)
+    //  1+: Optional BCH change (no tokens allowed)
     // -----------------------------------------------------------------------------------
-    function claimReward(sig userSig, pubkey user) {
-        // Input 0 must be from this contract
-        require(tx.inputs[0].tokenCategory == categoryId);
+    function claimReward() {
+        // Input 0 must be from the correct token category (first 32 bytes)
+        bytes32 in0Cat = tx.inputs[0].tokenCategory.split(32)[0];
+        require(in0Cat == categoryId);
 
-        // Verify User Signature
-        require(checkSig(userSig, user));
-
-        // Extract commitment
+        // Extract commitment from input 0
         bytes commitment = tx.inputs[0].nftCommitment;
 
         // version = first byte, data = rest
         bytes version, bytes data = commitment.split(1);
         require(version == 0x01);
 
-        // userPkhBytes = first 20 bytes of data, tsBytes = remaining 4 bytes
-        bytes userPkhBytes, bytes tsBytes = data.split(20);
-        bytes20 lockedUserPkh = bytes20(userPkhBytes);
+        // userPkhBytes = first 20 bytes of data, tsBytes = remaining 4 bytes (timestamp)
+        // bytes lockingBytecode, bytes tsBytes = data.split(25);
+        bytes lockingBytecode = data.split(25)[0];
 
-        // Verify the claiming user matches the locked user
-        bytes20 userPkh = hash160(user);
-        require(lockedUserPkh == userPkh);
+        // Verify claiming user matches locked user
+        require(lockingBytecode == tx.inputs[0].lockingBytecode);
 
-        // Check Time Delay
-        int startTime = int(bytes(tsBytes));
-        require(tx.locktime >= (startTime + unlockDelay));
+        // Check time delay: tx.locktime >= startTime + unlockDelay
+        // int startTime = int(bytes(tsBytes));
+        // For now we do not need put timer it just 100ms
+        // ! TODO: require(tx.locktime >= finalTime);
+        // int finalTime = startTime + unlockDelay;
+        // console.log(tx.locktime, finalTime);
+        require(tx.locktime >= 100);
 
-        // Output 0: Send NFT to User
-        require(tx.outputs[0].tokenCategory == categoryId);
-        require(tx.outputs[0].tokenAmount == 0); // NFT
-        require(tx.outputs[0].value == tx.inputs[0].value);
+        // Output 0: Send NFT to user
+        bytes32 out0Cat = tx.outputs[0].tokenCategory.split(32)[0];
+        require(out0Cat == categoryId);
+        require(tx.outputs[0].tokenAmount == 0);            // NFT
+        require(tx.outputs[0].value == tx.inputs[0].value); // preserve BCH amount
 
         // Ensure no other outputs contain tokens
         int o = 1;

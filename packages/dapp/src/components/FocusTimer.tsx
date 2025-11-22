@@ -5,14 +5,20 @@ import { useCallback, useEffect, useState } from "react";
 export default function FocusTimer({
 	onStart,
 	onEnd,
+	onTransactionConfirmed,
+	duration = 25 * 60, // Default 25 minutes
 }: {
-	onStart?: () => void;
+	onStart?: () => Promise<void>;
 	onEnd?: () => void;
+	onTransactionConfirmed?: () => void;
+	duration?: number; // Duration in seconds
 }) {
-	const FOCUS_TIME = 25 * 60; // 25 minutes in seconds
+	const FOCUS_TIME = duration;
 	const [timeLeft, setTimeLeft] = useState(FOCUS_TIME);
 	const [isActive, setIsActive] = useState(false);
 	const [message, setMessage] = useState("");
+	const [isWaitingForTx, setIsWaitingForTx] = useState(false);
+	const [isWaitingForFocus, setIsWaitingForFocus] = useState(false);
 
 	const formatTime = (seconds: number) => {
 		const mins = Math.floor(seconds / 60);
@@ -21,12 +27,14 @@ export default function FocusTimer({
 	};
 
 	const handleVisibilityChange = useCallback(() => {
-		if (document.hidden && isActive) {
-			setIsActive(false);
-			setTimeLeft(FOCUS_TIME);
-			setMessage("Focus lost! Timer reset.");
+		if (!document.hidden && isWaitingForFocus) {
+			// User focused back on website after transaction confirmed
+			setIsWaitingForFocus(false);
+			setIsActive(true);
+			setMessage("Timer started!");
+			onTransactionConfirmed?.();
 		}
-	}, [isActive]);
+	}, [isWaitingForFocus, onTransactionConfirmed]);
 
 	useEffect(() => {
 		document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -51,19 +59,48 @@ export default function FocusTimer({
 		return () => clearInterval(interval);
 	}, [isActive, timeLeft, onEnd]);
 
-	const toggleTimer = () => {
-		if (!isActive) {
-			setMessage("");
+	const toggleTimer = async () => {
+		if (!isActive && !isWaitingForTx && !isWaitingForFocus) {
+			// Starting timer - trigger transaction
+			setMessage("Sending transaction...");
+			setIsWaitingForTx(true);
 			if (timeLeft === 0) setTimeLeft(FOCUS_TIME);
-			onStart?.();
+
+			try {
+				// Call onStart which returns a promise
+				await onStart?.();
+
+				// Transaction confirmed
+				setIsWaitingForTx(false);
+				setMessage(
+					"Transaction confirmed! Focus on the website to start timer.",
+				);
+				setIsWaitingForFocus(true);
+
+				// If user is already focused, start immediately
+				if (!document.hidden) {
+					setIsWaitingForFocus(false);
+					setIsActive(true);
+					setMessage("Timer started!");
+					onTransactionConfirmed?.();
+				}
+			} catch (error) {
+				setIsWaitingForTx(false);
+				setIsWaitingForFocus(false);
+				setMessage("Transaction failed!");
+			}
+		} else if (isActive) {
+			// Pause timer
+			setIsActive(false);
 		}
-		setIsActive(!isActive);
 	};
 
 	const resetTimer = () => {
 		setIsActive(false);
 		setTimeLeft(FOCUS_TIME);
 		setMessage("");
+		setIsWaitingForTx(false);
+		setIsWaitingForFocus(false);
 	};
 
 	return (
@@ -77,7 +114,15 @@ export default function FocusTimer({
 				</div>
 				{message && (
 					<div
-						className={`text-xs mt-1 font-medium ${message.includes("complete") ? "text-emerald-400" : "text-red-400"}`}
+						className={`text-xs mt-1 font-medium ${
+							message.includes("complete")
+								? "text-emerald-400"
+								: message.includes("failed") || message.includes("lost")
+									? "text-red-400"
+									: message.includes("confirmed") || message.includes("started")
+										? "text-emerald-400"
+										: "text-yellow-400"
+						}`}
 					>
 						{message}
 					</div>
@@ -88,19 +133,29 @@ export default function FocusTimer({
 				<button
 					type="button"
 					onClick={toggleTimer}
+					disabled={isWaitingForTx || isWaitingForFocus}
 					className={`px-6 py-3 rounded-xl font-semibold transition-all shadow-lg ${
-						isActive
-							? "bg-red-500/20 text-red-200 hover:bg-red-500/30 border border-red-500/30"
-							: "bg-emerald-500 text-white hover:bg-emerald-600 border border-emerald-400/50 shadow-emerald-500/20"
+						isWaitingForTx || isWaitingForFocus
+							? "bg-yellow-500/20 text-yellow-200 border border-yellow-500/30 cursor-wait"
+							: isActive
+								? "bg-red-500/20 text-red-200 hover:bg-red-500/30 border border-red-500/30"
+								: "bg-emerald-500 text-white hover:bg-emerald-600 border border-emerald-400/50 shadow-emerald-500/20"
 					}`}
 				>
-					{isActive ? "Pause" : "Start Focus"}
+					{isWaitingForTx
+						? "Confirming..."
+						: isWaitingForFocus
+							? "Focus to Start"
+							: isActive
+								? "Pause"
+								: "Start Focus"}
 				</button>
 
 				<button
 					type="button"
 					onClick={resetTimer}
-					className="p-3 rounded-xl bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white border border-white/10 transition-all"
+					disabled={isWaitingForTx}
+					className="p-3 rounded-xl bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white border border-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
 					title="Reset Timer"
 				>
 					<svg

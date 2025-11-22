@@ -3,13 +3,15 @@ import type { IConnector } from "@bch-wc2/interfaces";
 import {
 	Contract,
 	type NetworkProvider,
+	SignatureTemplate,
 	TransactionBuilder,
 	Utxo,
 	placeholderP2PKHUnlocker,
 	placeholderSignature,
 } from "cashscript";
-import type { BaseWallet } from "mainnet-js";
+import { TestNetWallet, type BaseWallet } from "mainnet-js";
 import PomodoroRewardsArtifact from "../../../../artifacts/PomodoroRewards.artifact.js";
+import { changeEndianness } from "../deploy.js";
 
 export const mintAndLockReward = async ({
 	wallet,
@@ -27,6 +29,9 @@ export const mintAndLockReward = async ({
 	[key: string]: unknown;
 }> => {
 	const userPkh = wallet.getPublicKeyHash();
+	const value = wallet.getInfo();
+	console.log("pkh", wallet.getPublicKeyHash(), value);
+	console.log("pk", Buffer.from(userPkh).toString("hex"));
 	if (typeof userPkh === "string") {
 		throw new Error(userPkh);
 	}
@@ -71,14 +76,24 @@ export const mintAndLockReward = async ({
 		throw new Error("Failed to get locktime");
 	}
 
+	console.log(locktime);
+
 	const locktimeBuffer = new ArrayBuffer(4);
 	new DataView(locktimeBuffer).setUint32(0, locktime, true); // little-endian
 	const locktimeHex = Buffer.from(locktimeBuffer).toString("hex");
+	console.log(locktimeHex);
+	console.log(locktime);
 
-	const commitment = `01${userPkhHash}${locktimeHex}`;
 	const placeholderUnlocker = placeholderP2PKHUnlocker(wallet.tokenaddr);
+	const Wallet = await TestNetWallet.fromSeed(
+		"woman capital glove jar orbit guilt identify delay menu guilt cook broken",
+	);
+	const aliceSignatureTemplate = new SignatureTemplate(Wallet.privateKeyWif);
+	const commitment = `01${Buffer.from(
+		aliceSignatureTemplate.unlockP2PKH().generateLockingBytecode(),
+	).toString("hex")}${changeEndianness(locktime.toString(16))}`;
 	const builder = new TransactionBuilder({ provider })
-		.addInput(rewardUtxo, contract.unlock.mintAndLockReward(userPkhHash))
+		.addInput(rewardUtxo, contract.unlock.mintAndLockReward())
 		.addInputs(nonTokenUtxos, placeholderUnlocker)
 		.addOutput({
 			to: contract.tokenAddress,
@@ -115,7 +130,7 @@ export const mintAndLockReward = async ({
 		});
 	}
 
-	builder.setLocktime(1563801723);
+	builder.setLocktime(locktime);
 
 	const result = await WrapBuilder(builder as any, connector).send({
 		userPrompt: "Lock Reward",

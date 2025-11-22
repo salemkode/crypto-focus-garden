@@ -41,7 +41,7 @@ export const deploy = async ({
 	console.log([changeEndianness(categoryId), 1500n]);
 	const p2pkhContract = new Contract(
 		PomodoroRewardsArtifact,
-		[changeEndianness(categoryId), 1500n],
+		[changeEndianness(categoryId)],
 		{
 			provider,
 			addressType: "p2sh20",

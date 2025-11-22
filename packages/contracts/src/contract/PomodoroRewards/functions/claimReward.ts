@@ -9,6 +9,7 @@ import {
 } from "cashscript";
 import type { BaseWallet } from "mainnet-js";
 import type PomodoroRewardsArtifact from "../../../../artifacts/PomodoroRewards.artifact.js";
+import { changeEndianness } from "../deploy.js";
 
 export const claimReward = async ({
 	wallet,
@@ -55,26 +56,18 @@ export const claimReward = async ({
 	const now = Math.floor(Date.now() / 1000);
 
 	const address = wallet.cashaddr;
-	console.log(wallet.getPublicKeyHash());
-	console.log((wallet as any).getPublicKeyCompressed());
 
 	const builder = new TransactionBuilder({ provider });
 	const placeholderUnlocker = placeholderP2PKHUnlocker(wallet.tokenaddr);
 	// Add input with unlocker
 	builder
-		.addInput(
-			lockedUtxo,
-			contract.unlock.claimReward(
-				placeholderSignature(),
-				await (wallet as any).getPublicKeyCompressed(),
-			),
-		)
+		.addInput(lockedUtxo, contract.unlock.claimReward())
 		.addInputs(nonTokenUtxos, placeholderUnlocker)
 		.addOutput({
 			to: address,
 			amount: lockedUtxo.satoshis,
 			token: {
-				category: categoryId,
+				category: changeEndianness(categoryId),
 				amount: 0n,
 				nft: {
 					capability: "none",

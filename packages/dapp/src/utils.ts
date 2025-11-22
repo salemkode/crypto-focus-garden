@@ -212,7 +212,7 @@ export const addMissingBCMRsInternal = async (categories: string[]) => {
 				continue;
 			}
 			transaction.inputs.forEach(
-				(input) => (input.outpointIndex = Number(input.outpoint_index)),
+				(input: any) => (input.outpointIndex = Number(input.outpoint_index)),
 			);
 			transaction.outputs.forEach((output: any) => {
 				output.outputIndex = Number(output.output_index);
