@@ -2,17 +2,28 @@ import type { IConnector } from "@bch-wc2/interfaces";
 import { WrapWallet } from "@bch-wc2/mainnet-js-signer";
 import { Contract, type NetworkProvider } from "cashscript";
 import { type BaseWallet, SendRequest } from "mainnet-js";
-import P2PKHArtifact from "../../../artifacts/P2PKH.artifact.js";
+import PomodoroRewardsArtifact from "../../../artifacts/PomodoroRewards.artifact.js";
 
+export const changeEndianness = (string: string) => {
+	const result = [];
+	let len = string.length - 2;
+	while (len >= 0) {
+		result.push(string.substr(len, 2));
+		len -= 2;
+	}
+	return result.join("");
+};
 export const deploy = async ({
 	wallet,
 	provider,
 	connector,
+	categoryId,
 	value,
 }: {
 	wallet: BaseWallet;
 	provider: NetworkProvider;
 	connector: IConnector;
+	categoryId: string;
 	value: bigint;
 }) => {
 	if (value < 1000n) {
@@ -21,12 +32,19 @@ export const deploy = async ({
 		);
 	}
 
+	const userPk = wallet.getPublicKeyHash();
+	if (typeof userPk !== "string") {
+		throw new Error("User public key is not a string");
+	}
 	const signer = WrapWallet(wallet, connector);
 
 	const p2pkhContract = new Contract(
-		P2PKHArtifact,
-		[wallet.getPublicKeyHash()],
-		{ provider, addressType: "p2sh20" },
+		PomodoroRewardsArtifact,
+		[changeEndianness(categoryId), 1500n],
+		{
+			provider,
+			addressType: "p2sh20",
+		},
 	);
 
 	// "deploy" contract by sending some BCH value

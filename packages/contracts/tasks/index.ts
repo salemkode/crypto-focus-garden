@@ -1,5 +1,5 @@
 import { compileString } from "cashc";
-import fs from "node:fs";
+import * as fs from "node:fs";
 import { URL } from "node:url";
 import urlJoin from "url-join";
 

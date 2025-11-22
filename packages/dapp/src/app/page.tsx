@@ -3,20 +3,23 @@
 import type { IConnector, WcSignTransactionRequest } from "@bch-wc2/interfaces";
 import { useWeb3ModalConnectorContext } from "@bch-wc2/web3modal-connector";
 import { decodeTransaction, hexToBin } from "@bitauth/libauth";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import ConnectButton from "@/components/ConnectButton";
 import FinishTransactionModal from "@/components/FinishTransactionModal";
 import FocusTimer from "@/components/FocusTimer";
 import P2PKHView from "@/components/P2PKHView";
 import ThreeScene from "@/components/ThreeScene";
+import { usePomodoro } from "@/hooks/usePomodoro";
 
 export default function Home() {
 	const { connector, address } = useWeb3ModalConnectorContext();
+	const { checkUserHasUtxoVout0, mintAndPlant } = usePomodoro();
 
 	const showError = useCallback((message: string) => {
 		setError(message);
 		setTimeout(() => setError(""), 10000);
 	}, []);
+
 	const wrappedConnector = useMemo(
 		() =>
 			connector
@@ -57,10 +60,86 @@ export default function Home() {
 	const [info, setInfo] = useState<string>("");
 	const [showWallet, setShowWallet] = useState(false);
 
+	// New State for Flow
+	const [appReady, setAppReady] = useState(false);
+	const [isChecking, setIsChecking] = useState(false);
+	const [isMinting, setIsMinting] = useState(false);
+	const [statusMessage, setStatusMessage] = useState("");
+
 	const showInfo = useCallback((message: string) => {
 		setInfo(message);
 		setTimeout(() => setInfo(""), 10000);
 	}, []);
+
+	const handleWalletConnect = useCallback(async () => {
+		if (!address) return;
+
+		setIsChecking(true);
+		setStatusMessage("Checking your garden...");
+
+		try {
+			const hasVout0 = await checkUserHasUtxoVout0();
+
+			if (hasVout0) {
+				setIsMinting(true);
+				setStatusMessage("Planting your first seed...");
+				await mintAndPlant();
+				setStatusMessage("Seed planted!");
+			} else {
+				// If check fails (or user already has it? The prompt said "check is user has utxo vout = 0 and then mint")
+				// Wait, if they HAVE vout=0, then mint?
+				// "check is user has utxo vout = 0 and then mint nft"
+				// This implies if condition is TRUE -> Mint.
+				// If FALSE -> Proceed? Or do nothing?
+				// I will assume if FALSE, we just proceed (maybe they already minted and spent it? or they don't qualify?)
+				// But usually "check condition then do action" implies the action is conditional on the check.
+				// However, "vout=0" is a very specific check (maybe checking for a genesis output?).
+				// Let's stick to: If hasVout0 -> Mint. Then -> App Ready.
+				// If !hasVout0 -> App Ready (skip mint).
+				console.log("User does not have vout=0 UTXO, skipping mint.");
+			}
+		} catch (e: any) {
+			console.error("Error in initialization flow:", e);
+			showError(`Initialization failed: ${e.message}`);
+		} finally {
+			setIsChecking(false);
+			setIsMinting(false);
+			setAppReady(true);
+		}
+	}, [address, checkUserHasUtxoVout0, mintAndPlant, showError]);
+
+	// Trigger flow when address becomes available
+	useEffect(() => {
+		if (address && !appReady && !isChecking && !isMinting) {
+			handleWalletConnect();
+		}
+	}, [address, appReady, isChecking, isMinting, handleWalletConnect]);
+
+	// If app is not ready, show blank screen or connect button
+	if (!appReady) {
+		return (
+			<div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-900 text-white">
+				{address ? (
+					<div className="flex flex-col items-center gap-4">
+						<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
+						<p className="text-lg font-medium text-emerald-200">
+							{statusMessage || "Initializing..."}
+						</p>
+					</div>
+				) : (
+					<div className="flex flex-col items-center gap-6">
+						<h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-500">
+							Welcome to Focus Garden
+						</h1>
+						<p className="text-slate-400 max-w-md text-center">
+							Connect your wallet to enter your personal focus sanctuary.
+						</p>
+						<ConnectButton />
+					</div>
+				)}
+			</div>
+		);
+	}
 
 	return (
 		<div className="relative h-screen w-screen overflow-hidden bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white font-sans">

@@ -121,7 +121,7 @@ export default function P2PKHView({
 							defaultValue={1000}
 							type="number"
 							placeholder="Amount in satoshis"
-							className="border p-2 rounded-md mr-2 mt-2 text-black"
+							className="border p-2 rounded-md mr-2 mt-2"
 						/>
 						<button
 							onClick={deployContract}

@@ -2,7 +2,7 @@ import type { IConnector } from "@bch-wc2/interfaces";
 import { P2PKH } from "@dapp-starter/contracts";
 import { useQuery } from "@tanstack/react-query";
 import { ElectrumNetworkProvider } from "cashscript";
-import { Wallet } from "mainnet-js";
+import { TestNetWallet as Wallet } from "mainnet-js";
 
 export function useP2PKHContract(address?: string, connector?: IConnector) {
 	const { data: p2pkh } = useQuery({

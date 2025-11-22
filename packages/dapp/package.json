@@ -11,12 +11,10 @@
 	"dependencies": {
 		"@bch-wc2/interfaces": "^0.0.16",
 		"@bch-wc2/web3modal-connector": "^0.0.16",
-		"@bitauth/libauth": "3.1.0-next.8",
 		"@dapp-starter/contracts": "workspace:*",
 		"@mainnet-cash/bcmr": "^2.7.24",
 		"@tanstack/react-query": "^5.90.10",
 		"blockies": "^0.0.2",
-		"cashscript": "^0.12.0",
 		"next": "16.0.1",
 		"react": "19.2.0",
 		"react-dom": "19.2.0",

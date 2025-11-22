@@ -1,9 +1,8 @@
-import type { WrapWallet } from "@bch-wc2/mainnet-js-signer";
 import {
 	bigIntToVmNumber,
 	type CashAddressNetworkPrefix,
-	type CashAddressType,
 	cashAddressToLockingBytecode,
+	type CashAddressType,
 	decodeCashAddress,
 	encodeCashAddress,
 	hexToBin,
@@ -12,6 +11,7 @@ import {
 } from "@bitauth/libauth";
 import type { TokenDetails, Utxo } from "cashscript";
 import type { UtxoI } from "mainnet-js";
+import type { WrapWallet } from "@bch-wc2/mainnet-js-signer";
 
 export const require = (predicate: boolean, message: string) => {
 	if (!predicate) {
@@ -92,7 +92,7 @@ export const consolidateUtxos = async ({
 }: {
 	signer: ReturnType<typeof WrapWallet>;
 	minSatoshis?: bigint;
-}) => {
+}): Promise<Awaited<ReturnType<ReturnType<typeof WrapWallet>["send"]>>> => {
 	if (!minSatoshis) {
 		return signer.sendMax(signer.cashaddr, {
 			userPrompt: "Sign to consolidate UTXOs",

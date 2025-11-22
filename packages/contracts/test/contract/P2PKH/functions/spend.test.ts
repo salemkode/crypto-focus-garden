@@ -1,12 +1,12 @@
 import { PrivKeyConnector } from "@bch-wc2/privkey-connector";
 import { MockNetworkProvider, randomUtxo } from "cashscript";
-import { P2PKH } from "../../../../src/contract/P2PKH/P2PKH.js";
 import {
 	aliceAddress,
 	alicePriv,
 	bobAddress,
 	MockWallet,
 } from "../../../shared.js";
+import { P2PKH } from "../../../../src/contract/P2PKH/P2PKH.js";
 
 describe("Spend tests", () => {
 	test("Should spend some funds (all utxos)", async () => {
@@ -54,10 +54,10 @@ describe("Spend tests", () => {
 		expect(await p2pkh.contract.getBalance()).toBe(30000n);
 
 		// spend using 2 utxos
-		// const spendResult = await p2pkh.spend({
-		// 	destination: bobAddress,
-		// 	value: 25000n,
-		// });
+		await p2pkh.spend({
+			destination: bobAddress,
+			value: 25000n,
+		});
 
 		// check bob received funds
 		const bobUtxos = await provider.getUtxos(bobAddress);
@@ -106,10 +106,10 @@ describe("Spend tests", () => {
 		expect(await p2pkh.contract.getBalance()).toBe(30000n);
 
 		// spend all funds
-		// const spendResult = await p2pkh.spend({
-		// 	destination: bobAddress,
-		// 	value: 30000n,
-		// });
+		await p2pkh.spend({
+			destination: bobAddress,
+			value: 30000n,
+		});
 
 		// check bob received funds
 		const bobUtxos = await provider.getUtxos(bobAddress);

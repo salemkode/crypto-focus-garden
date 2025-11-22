@@ -1,7 +1,7 @@
 {
 	"name": "@dapp-starter/root",
 	"private": true,
-	"version": "0.0.2",
+	"version": "0.0.1",
 	"workspaces": [
 		"packages/contracts",
 		"packages/dapp",
@@ -9,17 +9,17 @@
 	],
 	"license": "MIT",
 	"scripts": {
+		"compile": "bun run --filter='*' compile",
 		"dev": "bun run --filter='*' dev",
 		"bump": "node bump_version.cjs",
-		"publish": "bun run --filter='*' publish:public",
-		"build": "bun run --filter='*' build",
-		"test": "bun run --filter='*' test",
+		"publish": "yarn workspaces run publish:public",
+		"build": "yarn workspaces run build",
+		"test": "yarn workspaces run test",
 		"clean": "rm -rf packages/**/dist"
 	},
 	"dependencies": {
 		"@bch-wc2/interfaces": "^0.0.16",
 		"@bitauth/libauth": "^3.0.0",
-		"cashscript": "^0.12.0",
-		"mainnet-js": "^2.7.31"
+		"cashscript": "^0.13.0-next.1"
 	}
 }
