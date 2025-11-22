@@ -1,58 +1,14 @@
 "use client";
 
-import { useWeb3ModalConnectorContext } from "@bch-wc2/web3modal-connector";
-import { useQuery } from "@tanstack/react-query";
-import type React from "react";
-import { useCallback, useState } from "react";
 import { useWatchAddress } from "@/hooks/useWatchAddress";
-import {
-	addMissingBCMRs,
-	getTokenDecimals,
-	getTokenImage,
-	getTokenLabel,
-	getTokenName,
-} from "@/utils";
+import { useWeb3ModalConnectorContext } from "@bch-wc2/web3modal-connector";
+import React, { useCallback, useState } from "react";
 
 const ConnectButton: React.FC = () => {
 	const { address, connect, disconnect, isConnected } =
 		useWeb3ModalConnectorContext();
 	const [loading, setLoading] = useState(false);
-	const { balance, utxos } = useWatchAddress(address || "");
-	const [showAssets, setShowAssets] = useState(false);
-	const { data: bcmrData } = useQuery({
-		queryKey: ["bcmr", utxos],
-		queryFn: async () => {
-			if (!utxos) return { categories: [], balances: {} };
-
-			const categories = utxos
-				.map((utxo) =>
-					utxo.token?.capability ? undefined : utxo.token?.tokenId,
-				)
-				.filter((tokenId) => tokenId !== undefined)
-				.filter(
-					(value, index, array) => array.indexOf(value) === index,
-				) as string[];
-
-			await addMissingBCMRs(categories);
-
-			const balances = categories.reduce(
-				(acc, category) => {
-					acc[category] = utxos
-						.filter((utxo) => utxo.token?.tokenId === category)
-						.reduce((acc, utxo) => acc + (utxo.token?.amount ?? 0n), 0n);
-					return acc;
-				},
-				{} as Record<string, bigint>,
-			);
-
-			return { categories, balances };
-		},
-		enabled: !!utxos,
-		staleTime: Infinity,
-	});
-
-	const categories = bcmrData?.categories || [];
-	const balancesByToken = bcmrData?.balances || {};
+	const { balance } = useWatchAddress(address || "");
 
 	const connectWallet = useCallback(async () => {
 		if (!connect) {
@@ -62,7 +18,7 @@ const ConnectButton: React.FC = () => {
 		try {
 			setLoading(true);
 			await connect();
-		} catch {
+		} catch (err) {
 			alert("Failed to connect wallet.");
 		}
 		setLoading(false);
@@ -76,85 +32,66 @@ const ConnectButton: React.FC = () => {
 		try {
 			setLoading(true);
 			await disconnect();
-		} catch {
+		} catch (err) {
 			alert("Failed to disconnect wallet.");
 		}
 		setLoading(false);
 	}, [disconnect]);
 
+	// Format address: bchtest:qq...xxx -> bchtest:{5}...{3}
+	const formatAddress = (addr: string) => {
+		if (!addr) return "";
+		if (addr.length <= 13) return addr; // Should not happen for valid addresses
+		// bchtest: is 8 chars.
+		// We want prefix + 5 chars + ... + 3 chars
+		// Actually, let's just take the first 13 chars and the last 3.
+		// Example: bchtest:qqqqq...qqq
+		return `${addr.slice(0, 13)}...${addr.slice(-3)}`;
+	};
+
+	// Format balance: Always show BCH
+	const formatBalance = (bal: number) => {
+		if (bal === undefined || bal === null) return "0 BCH";
+		const bch = bal / 1e8;
+		return `${bch.toLocaleString("en-US", { maximumFractionDigits: 8 })} BCH`;
+	};
+
 	return (
 		<div className="flex flex-col w-full">
 			{isConnected ? (
-				<div className="flex flex-col w-full items-end gap-2">
+				<div className="flex flex-row items-center gap-4">
+					<div className="flex flex-col items-end md:items-start">
+						<span className="text-sm font-mono text-emerald-200/80">
+							{formatAddress(address || "")}
+						</span>
+						<span className="text-xs font-bold text-white">
+							{formatBalance(balance ?? 0)}
+						</span>
+					</div>
 					<button
 						onClick={disconnectWallet}
 						disabled={loading}
-						className={`px-4 py-2 rounded-md font-bold text-white text-sm transition-colors ${
+						className={`px-4 py-2 rounded-xl font-bold text-white text-sm transition-all shadow-lg ${
 							loading
-								? "bg-gray-400 cursor-not-allowed"
-								: "bg-black hover:bg-gray-700 cursor-pointer"
+								? "bg-slate-600 cursor-not-allowed"
+								: "bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-200"
 						}`}
 					>
-						{loading ? "Disconnecting..." : "Disconnect"}
+						{loading ? "..." : "Disconnect"}
 					</button>
-
-					<span>{address}</span>
-					<p className="text-right">Balance: {(balance ?? 0) / 1e8} BCH</p>
-					{categories && (
-						<p
-							className="underline decoration-dashed cursor-pointer"
-							onClick={() => setShowAssets(!showAssets)}
-						>
-							Assets: {categories.length}
-						</p>
-					)}
-					{showAssets && (
-						<div className="h-72 rounded-md border p-3 overflow-y-scroll absolute bg-white dark:bg-zinc-800 shadow-md mt-33">
-							<div className="flex flex-col">
-								{categories?.map((category) => (
-									<div key={category} className="mt-3 text-sm">
-										<div className="flex flex-row gap-2">
-											<img
-												className="rounded-full w-12 h-12"
-												src={getTokenImage(category)}
-												width={48}
-												height={48}
-											/>
-											<div className="flex flex-col">
-												<div>{getTokenName(category)}</div>
-												<div className="flex flex-col gap">
-													<div className="flex flex-row gap-3">
-														<div>
-															{(
-																Number(balancesByToken[category]) /
-																10 ** getTokenDecimals(category)
-															).toFixed(getTokenDecimals(category))}
-														</div>
-														<div>${getTokenLabel(category)}</div>
-													</div>
-												</div>
-											</div>
-										</div>
-									</div>
-								))}
-							</div>
-						</div>
-					)}
 				</div>
 			) : (
-				<div className="flex flex-col w-full items-end gap-2">
-					<button
-						onClick={connectWallet}
-						disabled={loading}
-						className={`px-4 py-2 rounded-md font-bold text-white text-sm transition-colors ${
-							loading
-								? "bg-gray-400 cursor-not-allowed"
-								: "bg-black hover:bg-gray-700 cursor-pointer"
-						}`}
-					>
-						{loading ? "Connecting..." : "Connect Wallet"}
-					</button>
-				</div>
+				<button
+					onClick={connectWallet}
+					disabled={loading}
+					className={`px-6 py-2.5 rounded-xl font-bold text-white text-sm transition-all shadow-lg ${
+						loading
+							? "bg-slate-600 cursor-not-allowed"
+							: "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20"
+					}`}
+				>
+					{loading ? "Connecting..." : "Connect Wallet"}
+				</button>
 			)}
 		</div>
 	);

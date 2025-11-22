@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-export default function FocusTimer() {
+export default function FocusTimer({
+	onStart,
+	onEnd,
+}: {
+	onStart?: () => void;
+	onEnd?: () => void;
+}) {
 	const FOCUS_TIME = 25 * 60; // 25 minutes in seconds
 	const [timeLeft, setTimeLeft] = useState(FOCUS_TIME);
 	const [isActive, setIsActive] = useState(false);
@@ -39,15 +45,17 @@ export default function FocusTimer() {
 		} else if (timeLeft === 0) {
 			setIsActive(false);
 			setMessage("Focus session complete!");
+			onEnd?.();
 		}
 
 		return () => clearInterval(interval);
-	}, [isActive, timeLeft]);
+	}, [isActive, timeLeft, onEnd]);
 
 	const toggleTimer = () => {
 		if (!isActive) {
 			setMessage("");
 			if (timeLeft === 0) setTimeLeft(FOCUS_TIME);
+			onStart?.();
 		}
 		setIsActive(!isActive);
 	};

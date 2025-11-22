@@ -27,6 +27,10 @@ export const mintAndLockReward = async ({
 	[key: string]: unknown;
 }> => {
 	const userPkh = wallet.getPublicKeyHash();
+	if (typeof userPkh === "string") {
+		throw new Error(userPkh);
+	}
+	const userPkhHash = Buffer.from(userPkh).toString("hex");
 
 	// Get contract UTXOs
 	const contractUtxos = await contract.getUtxos();
@@ -46,33 +50,38 @@ export const mintAndLockReward = async ({
 			utxo.token?.amount === 0n &&
 			utxo.token?.nft?.commitment === "",
 	);
-
 	if (!rewardUtxo) {
-		throw new Error("No available reward NFT found");
+		throw new Error("No available reward NFT found, " + contract.address);
 	}
 
 	if (nonTokenUtxos.length === 0) {
 		throw new Error("No available non-token UTXOs found");
 	}
 
-	const now = Math.floor(Date.now() / 1000);
-	const locktime = now;
+	const blockHeight = await wallet.provider.getBlockHeight();
+	const locktime = await wallet.provider
+		.getHeader(blockHeight, true)
+		.then((header) => {
+			console.log(header);
+			if ("timestamp" in header) {
+				return header.timestamp;
+			}
+		});
+	if (!locktime) {
+		throw new Error("Failed to get locktime");
+	}
 
 	const locktimeBuffer = new ArrayBuffer(4);
 	new DataView(locktimeBuffer).setUint32(0, locktime, true); // little-endian
 	const locktimeHex = Buffer.from(locktimeBuffer).toString("hex");
 
-	const commitment = `01${userPkh}${locktimeHex}`;
-
+	const commitment = `01${userPkhHash}${locktimeHex}`;
 	const placeholderUnlocker = placeholderP2PKHUnlocker(wallet.tokenaddr);
 	const builder = new TransactionBuilder({ provider })
-		.addInput(
-			rewardUtxo,
-			contract.unlock.mintAndLockReward(wallet.getPublicKeyHash()),
-		)
+		.addInput(rewardUtxo, contract.unlock.mintAndLockReward(userPkhHash))
 		.addInputs(nonTokenUtxos, placeholderUnlocker)
 		.addOutput({
-			to: contract.address,
+			to: contract.tokenAddress,
 			amount: rewardUtxo.satoshis,
 			token: {
 				category: categoryId,
@@ -84,7 +93,7 @@ export const mintAndLockReward = async ({
 			},
 		})
 		.addOutput({
-			to: contract.address,
+			to: contract.tokenAddress,
 			amount: rewardUtxo.satoshis,
 			token: {
 				category: categoryId,
@@ -95,30 +104,30 @@ export const mintAndLockReward = async ({
 				},
 			},
 		});
-
 	const totalBchAmount = nonTokenUtxos.reduce(
 		(acc, utxo) => acc + utxo.satoshis,
 		0n,
 	);
-	if (nonTokenUtxos.length > 0 && totalBchAmount >= 2000n) {
+	if (nonTokenUtxos.length > 0 && totalBchAmount >= 3000n) {
 		builder.addOutput({
 			to: wallet.tokenaddr,
-			amount: totalBchAmount - 2000n,
+			amount: totalBchAmount - 3000n,
 		});
 	}
 
-	builder.setLocktime(locktime);
+	builder.setLocktime(1563801723);
 
 	const result = await WrapBuilder(builder as any, connector).send({
 		userPrompt: "Lock Reward",
 		broadcast: false,
 	});
 
-	await provider.sendRawTransaction(result.signedTransaction);
+	await provider.sendRawTransaction(result.signedTransaction).then(console.log);
 
 	return {
 		txid: result.txid,
 		locktime,
 		commitment,
+		signedTx: result.signedTransaction,
 	};
 };

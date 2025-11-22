@@ -33,11 +33,12 @@ export const deploy = async ({
 	}
 
 	const userPk = wallet.getPublicKeyHash();
-	if (typeof userPk !== "string") {
-		throw new Error("User public key is not a string");
+	if (typeof userPk === "string") {
+		throw new Error(userPk);
 	}
 	const signer = WrapWallet(wallet, connector);
 
+	console.log([changeEndianness(categoryId), 1500n]);
 	const p2pkhContract = new Contract(
 		PomodoroRewardsArtifact,
 		[changeEndianness(categoryId), 1500n],

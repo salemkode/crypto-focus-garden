@@ -27,8 +27,19 @@ export default function ThreeScene({ number = 6, className }: ThreeSceneProps) {
 		// scene.background = new THREE.Color(0xe0f7fa); // Removed for transparency
 
 		// Orthographic Camera for Isometric View
+		// Orthographic Camera for Isometric View
 		const aspect = container.clientWidth / container.clientHeight;
-		const d = 18; // Increased view size for larger grid
+
+		// Dynamic view size calculation
+		const calculateViewSize = () => {
+			// If width is small (mobile), increase view size to "zoom out"
+			// Base size 18 for desktop
+			// For mobile (< 768px), maybe 28?
+			return window.innerWidth < 768 ? 28 : 18;
+		};
+
+		let d = calculateViewSize();
+
 		const camera = new THREE.OrthographicCamera(
 			-d * aspect,
 			d * aspect,
@@ -232,6 +243,10 @@ export default function ThreeScene({ number = 6, className }: ThreeSceneProps) {
 		const handleResize = () => {
 			if (!container) return;
 			const aspect = container.clientWidth / container.clientHeight;
+
+			// Recalculate view size on resize
+			d = calculateViewSize();
+
 			camera.left = -d * aspect;
 			camera.right = d * aspect;
 			camera.top = d;

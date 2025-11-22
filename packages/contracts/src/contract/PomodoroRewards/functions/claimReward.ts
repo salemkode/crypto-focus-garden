@@ -54,8 +54,9 @@ export const claimReward = async ({
 
 	const now = Math.floor(Date.now() / 1000);
 
-	// @ts-ignore
-	const address = wallet.address as string;
+	const address = wallet.cashaddr;
+	console.log(wallet.getPublicKeyHash());
+	console.log((wallet as any).getPublicKeyCompressed());
 
 	const builder = new TransactionBuilder({ provider });
 	const placeholderUnlocker = placeholderP2PKHUnlocker(wallet.tokenaddr);
@@ -63,7 +64,10 @@ export const claimReward = async ({
 	builder
 		.addInput(
 			lockedUtxo,
-			contract.unlock.claimReward(placeholderSignature(), userPkh),
+			contract.unlock.claimReward(
+				placeholderSignature(),
+				await (wallet as any).getPublicKeyCompressed(),
+			),
 		)
 		.addInputs(nonTokenUtxos, placeholderUnlocker)
 		.addOutput({

@@ -5,16 +5,22 @@ import { useWeb3ModalConnectorContext } from "@bch-wc2/web3modal-connector";
 import { decodeTransaction, hexToBin } from "@bitauth/libauth";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ConnectButton from "@/components/ConnectButton";
+import ContractInfoModal from "@/components/ContractInfoModal";
 import FinishTransactionModal from "@/components/FinishTransactionModal";
 import FocusTimer from "@/components/FocusTimer";
-import P2PKHView from "@/components/P2PKHView";
 import ThreeScene from "@/components/ThreeScene";
 import { usePomodoro } from "@/hooks/usePomodoro";
+import WalletGuard from "@/components/WalletGuard";
+import type { BaseWallet } from "mainnet-js";
 
 export default function Home() {
-	const { connector, address } = useWeb3ModalConnectorContext();
-	const { checkUserHasUtxoVout0, mintAndPlant } = usePomodoro();
+	return (
+		<WalletGuard>{(wallet) => <HomeContent wallet={wallet} />}</WalletGuard>
+	);
+}
 
+function HomeContent({ wallet }: { wallet: BaseWallet }) {
+	const { connector, address } = useWeb3ModalConnectorContext();
 	const showError = useCallback((message: string) => {
 		setError(message);
 		setTimeout(() => setError(""), 10000);
@@ -38,8 +44,9 @@ export default function Home() {
 								}
 								const result = await connector.signTransaction(options);
 								return result;
-							} catch (e) {
+							} catch (e: any) {
 								console.error(e);
+								// @ts-ignore
 								showError(`Unable to sign transaction: ${e.message}`);
 							} finally {
 								setShowFinishTransactionModal(false);
@@ -50,15 +57,18 @@ export default function Home() {
 				: (undefined as IConnector | undefined),
 		[connector, showError],
 	);
+	// const wallet = useWallet(); // Provided by prop now
+	const { mintAndLock, claim, getTreeCount, contractAddress, categoryId } =
+		usePomodoro(wallet, wrappedConnector);
 
-	const [count, setCount] = useState<number>(10);
+	const [count, setCount] = useState<number>(0);
 	const [showFinishTransactionModal, setShowFinishTransactionModal] =
 		useState<boolean>(false);
+	const [showContractInfo, setShowContractInfo] = useState<boolean>(false);
 	const [finishTransactionMessage, setFinishTransactionMessage] =
 		useState<string>("");
 	const [error, setError] = useState<string>("");
 	const [info, setInfo] = useState<string>("");
-	const [showWallet, setShowWallet] = useState(false);
 
 	// New State for Flow
 	const [appReady, setAppReady] = useState(false);
@@ -71,6 +81,13 @@ export default function Home() {
 		setTimeout(() => setInfo(""), 10000);
 	}, []);
 
+	// Fetch tree count
+	useEffect(() => {
+		if (address) {
+			getTreeCount().then(setCount);
+		}
+	}, [address, getTreeCount]);
+
 	const handleWalletConnect = useCallback(async () => {
 		if (!address) return;
 
@@ -78,26 +95,7 @@ export default function Home() {
 		setStatusMessage("Checking your garden...");
 
 		try {
-			const hasVout0 = await checkUserHasUtxoVout0();
-
-			if (hasVout0) {
-				setIsMinting(true);
-				setStatusMessage("Planting your first seed...");
-				await mintAndPlant();
-				setStatusMessage("Seed planted!");
-			} else {
-				// If check fails (or user already has it? The prompt said "check is user has utxo vout = 0 and then mint")
-				// Wait, if they HAVE vout=0, then mint?
-				// "check is user has utxo vout = 0 and then mint nft"
-				// This implies if condition is TRUE -> Mint.
-				// If FALSE -> Proceed? Or do nothing?
-				// I will assume if FALSE, we just proceed (maybe they already minted and spent it? or they don't qualify?)
-				// But usually "check condition then do action" implies the action is conditional on the check.
-				// However, "vout=0" is a very specific check (maybe checking for a genesis output?).
-				// Let's stick to: If hasVout0 -> Mint. Then -> App Ready.
-				// If !hasVout0 -> App Ready (skip mint).
-				console.log("User does not have vout=0 UTXO, skipping mint.");
-			}
+			setAppReady(true);
 		} catch (e: any) {
 			console.error("Error in initialization flow:", e);
 			showError(`Initialization failed: ${e.message}`);
@@ -106,7 +104,7 @@ export default function Home() {
 			setIsMinting(false);
 			setAppReady(true);
 		}
-	}, [address, checkUserHasUtxoVout0, mintAndPlant, showError]);
+	}, [address, showError]);
 
 	// Trigger flow when address becomes available
 	useEffect(() => {
@@ -119,24 +117,12 @@ export default function Home() {
 	if (!appReady) {
 		return (
 			<div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-900 text-white">
-				{address ? (
-					<div className="flex flex-col items-center gap-4">
-						<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
-						<p className="text-lg font-medium text-emerald-200">
-							{statusMessage || "Initializing..."}
-						</p>
-					</div>
-				) : (
-					<div className="flex flex-col items-center gap-6">
-						<h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-500">
-							Welcome to Focus Garden
-						</h1>
-						<p className="text-slate-400 max-w-md text-center">
-							Connect your wallet to enter your personal focus sanctuary.
-						</p>
-						<ConnectButton />
-					</div>
-				)}
+				<div className="flex flex-col items-center gap-4">
+					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
+					<p className="text-lg font-medium text-emerald-200">
+						{statusMessage || "Initializing..."}
+					</p>
+				</div>
 			</div>
 		);
 	}
@@ -154,6 +140,13 @@ export default function Home() {
 				<FinishTransactionModal
 					onClose={() => setShowFinishTransactionModal(false)}
 					message={finishTransactionMessage}
+				/>
+			)}
+			{showContractInfo && (
+				<ContractInfoModal
+					onClose={() => setShowContractInfo(false)}
+					address={contractAddress}
+					categoryId={categoryId}
 				/>
 			)}
 			{(error.length > 0 || info.length > 0) && (
@@ -179,7 +172,7 @@ export default function Home() {
 			)}
 
 			{/* Header */}
-			<header className="absolute top-0 left-0 right-0 z-40 flex items-center justify-between px-8 py-6">
+			<header className="absolute top-0 left-0 right-0 z-40 flex items-center justify-between px-4 md:px-8 py-6">
 				<div className="flex items-center gap-3">
 					<div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/20">
 						<svg
@@ -196,18 +189,12 @@ export default function Home() {
 							/>
 						</svg>
 					</div>
-					<h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-emerald-200">
+					<h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-emerald-200 hidden md:block">
 						Focus Garden
 					</h1>
 				</div>
 
 				<div className="flex items-center gap-4">
-					<button
-						onClick={() => setShowWallet(!showWallet)}
-						className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 backdrop-blur-sm transition-all text-sm font-medium"
-					>
-						{showWallet ? "Hide Wallet" : "Show Wallet"}
-					</button>
 					<ConnectButton />
 				</div>
 			</header>
@@ -222,48 +209,76 @@ export default function Home() {
 				<div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl p-2 shadow-2xl flex items-center justify-between gap-4">
 					{/* Focus Timer Integration */}
 					<div className="flex-1">
-						<FocusTimer />
+						<FocusTimer
+							onStart={async () => {
+								try {
+									setStatusMessage("Planting a tree...");
+									const result = await mintAndLock();
+									localStorage.setItem(
+										"pomodoro_commitment",
+										result.commitment,
+									);
+									localStorage.setItem("pomodoro_pubkey", result.pubkey);
+									localStorage.setItem(
+										"pomodoro_locktime",
+										result.locktime.toString(),
+									);
+									setStatusMessage("Tree planted! Focus to grow it.");
+									showInfo("Tree planted! Focus to grow it.");
+									// Update tree count (it might not show up immediately until block, but we can optimistically increment? No, let's wait or fetch)
+									// Actually, mintAndLock returns immediately after broadcast.
+									// But indexer might take time.
+								} catch (e: any) {
+									console.error(e);
+									showError(`Failed to plant tree: ${e.message}`);
+								}
+							}}
+							onEnd={async () => {
+								try {
+									setStatusMessage("Harvesting your tree...");
+									const commitment = localStorage.getItem(
+										"pomodoro_commitment",
+									);
+									const pubkey = localStorage.getItem("pomodoro_pubkey");
+									if (commitment && pubkey) {
+										await claim(commitment, pubkey);
+										setStatusMessage("Tree harvested!");
+										showInfo("Tree harvested! You earned a reward.");
+										localStorage.removeItem("pomodoro_commitment");
+										localStorage.removeItem("pomodoro_pubkey");
+										localStorage.removeItem("pomodoro_locktime");
+										// Refresh tree count
+										getTreeCount().then(setCount);
+									} else {
+										showError("No tree found to harvest.");
+									}
+								} catch (e: any) {
+									console.error(e);
+									showError(`Failed to harvest tree: ${e.message}`);
+								}
+							}}
+						/>
 					</div>
-
-					{/* Quick Actions */}
-					<div className="flex flex-col gap-2 pr-4 border-l border-white/10 pl-4">
-						<div className="text-xs text-zinc-400 font-medium uppercase tracking-wider">
-							Garden Controls
-						</div>
-						<button
-							onClick={() => setCount(count + 1)}
-							className="px-4 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-200 text-sm font-semibold transition-all flex items-center gap-2"
+					<button
+						onClick={() => setShowContractInfo(true)}
+						className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white transition-all"
+						title="Contract Info"
+					>
+						<svg
+							className="w-5 h-5"
+							fill="none"
+							stroke="currentColor"
+							viewBox="0 0 24 24"
 						>
-							<svg
-								className="w-4 h-4"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									strokeWidth={2}
-									d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-								/>
-							</svg>
-							Add Tree
-						</button>
-					</div>
+							<path
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								strokeWidth={2}
+								d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+							/>
+						</svg>
+					</button>
 				</div>
-			</div>
-
-			{/* Wallet Panel (Slide-over) */}
-			<div
-				className={`absolute top-24 right-8 z-30 w-96 bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl transition-all duration-300 transform ${showWallet ? "translate-x-0 opacity-100" : "translate-x-[120%] opacity-0"}`}
-			>
-				<h2 className="text-xl font-bold mb-4 text-white">Wallet Details</h2>
-				<P2PKHView
-					address={address}
-					connector={wrappedConnector}
-					showError={showError}
-					showInfo={showInfo}
-				/>
 			</div>
 		</div>
 	);

@@ -1,18 +1,23 @@
+"use client";
 import { PomodoroRewards } from "@dapp-starter/contracts";
 import type { IConnector, WcSignTransactionRequest } from "@bch-wc2/interfaces";
 import { useWeb3ModalConnectorContext } from "@bch-wc2/web3modal-connector";
-import {
-	decodeTransaction,
-	hexToBin,
-	binToHex,
-	cashAddressToLockingBytecode,
-} from "@bitauth/libauth";
+import { decodeTransaction, hexToBin } from "@bitauth/libauth";
 import { ElectrumNetworkProvider } from "cashscript";
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import ConnectButton from "@/components/ConnectButton";
 import FinishTransactionModal from "@/components/FinishTransactionModal";
 
+import WalletGuard from "@/components/WalletGuard";
+import type { BaseWallet } from "mainnet-js";
+
 export default function ManagerPage() {
+	return (
+		<WalletGuard>{(wallet) => <ManagerContent wallet={wallet} />}</WalletGuard>
+	);
+}
+
+function ManagerContent({ wallet }: { wallet: BaseWallet }) {
 	const { connector, address } = useWeb3ModalConnectorContext();
 
 	const [categoryId, setCategoryId] = useState("");
@@ -45,7 +50,7 @@ export default function ManagerPage() {
 								}
 								const result = await connector.signTransaction(options);
 								return result;
-							} catch (e) {
+							} catch (e: any) {
 								console.error(e);
 								setError(`Unable to sign transaction: ${e.message}`);
 								throw e;
@@ -74,55 +79,17 @@ export default function ManagerPage() {
 		setDeployedAddress("");
 
 		try {
-			// Derive PKH from address
-			const lockScriptResult = cashAddressToLockingBytecode(address);
-			if (typeof lockScriptResult === "string") {
-				throw new Error(`Invalid address: ${lockScriptResult}`);
-			}
-			const bytecode = lockScriptResult.bytecode;
-
-			// Check if P2PKH (starts with 76a914... and ends with 88ac, length 25)
-			// 0x76 = OP_DUP, 0xa9 = OP_HASH160, 0x14 = Push 20 bytes, ... 0x88 = OP_EQUALVERIFY, 0xac = OP_CHECKSIG
-			// Bytecode length for P2PKH is 25 bytes.
-			let pkhHex = "";
-			if (
-				bytecode.length === 25 &&
-				bytecode[0] === 0x76 &&
-				bytecode[1] === 0xa9
-			) {
-				const pkh = bytecode.slice(3, 23);
-				pkhHex = binToHex(pkh);
-			} else {
-				// If not P2PKH, we might be in trouble if the contract expects a PKH.
-				// But for now, let's assume P2PKH or try to extract if it's P2SH (scripthash).
-				// If it's P2SH, it's 17...87.
-				// But PomodoroRewards likely expects a User PKH to verify signatures against.
-				// If we pass a script hash, it might not work as intended if the contract checks checksig.
-				// Let's assume P2PKH for now as it's the standard for wallets.
-				// If extraction fails, we throw.
-				throw new Error(
-					"Address must be P2PKH to deploy this contract (need Public Key Hash).",
-				);
-			}
-
-			const walletMock = {
-				getPublicKeyHash: () => {
-					return pkhHex;
-				},
-				getPublicKeyCompressed: async () => {
-					return new Uint8Array(33); // Placeholder, might not be needed for deploy if only funding
-				},
-			} as any;
+			// We can rely on the wallet object now.
 
 			const contract = await PomodoroRewards.deploy({
-				wallet: walletMock,
+				wallet: wallet,
 				provider,
 				connector: wrappedConnector,
 				categoryId,
 				value: BigInt(initialValue),
 			});
 
-			setDeployedAddress(contract.contract.address);
+			setDeployedAddress(contract.contract.tokenAddress);
 		} catch (e: any) {
 			console.error("Deployment failed:", e);
 			setError(e.message || "Deployment failed");
