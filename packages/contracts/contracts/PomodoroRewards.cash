@@ -53,8 +53,6 @@ contract PomodoroRewards(
 
         // Build commitment: 0x01 || hash160(user) || uint32(timestampStart)
         // Using tx.locktime as the session start timestamp
-        int time = tx.locktime;
-        bytes ts = bytes(tx.locktime);
         bytes ts = bytes(tx.locktime);
         bytes expectedCommitment = 0x01 + tx.inputs[1].lockingBytecode + ts;
 

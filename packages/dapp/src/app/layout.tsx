@@ -40,7 +40,20 @@ export default function RootLayout({
 			<body
 				className={`${geistSans.variable} ${geistMono.variable} antialiased`}
 			>
-				<Providers>{children}</Providers>
+				<Providers>
+					{children}
+					<div className="fixed bottom-6 left-6 hidden md:flex items-center gap-2 text-white/30 hover:text-white/80 transition-all duration-300 text-sm font-medium z-50">
+						<span>Built with ❤️ by</span>
+						<a
+							href="https://salemkode.com"
+							target="_blank"
+							rel="noopener noreferrer"
+							className="hover:text-emerald-400 transition-colors"
+						>
+							salemkode.com
+						</a>
+					</div>
+				</Providers>
 			</body>
 		</html>
 	);
