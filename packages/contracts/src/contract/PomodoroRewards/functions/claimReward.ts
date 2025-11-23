@@ -3,10 +3,10 @@ import type { IConnector } from "@bch-wc2/interfaces";
 import {
 	type Contract,
 	type NetworkProvider,
-	SignatureTemplate,
 	TransactionBuilder,
+	placeholderP2PKHUnlocker,
 } from "cashscript";
-import { TestNetWallet, type BaseWallet } from "mainnet-js";
+import type { BaseWallet } from "mainnet-js";
 import type PomodoroRewardsArtifact from "../../../../artifacts/PomodoroRewards.artifact.js";
 import { changeEndianness } from "../deploy.js";
 import { validateUtxo } from "../../../utils.js";
@@ -65,16 +65,12 @@ export const claimReward = async ({
 	const address = wallet.tokenaddr;
 
 	const builder = new TransactionBuilder({ provider });
-	const Wallet = await TestNetWallet.fromSeed(
-		"woman capital glove jar orbit guilt identify delay menu guilt cook broken",
-		"m/44'/145'/0'/0/0",
-	);
-	const aliceSignatureTemplate = new SignatureTemplate(Wallet.privateKeyWif);
+	const placeholderUnlocker = placeholderP2PKHUnlocker(wallet.tokenaddr);
 
 	// Add input with unlocker
 	builder
 		.addInput(lockedUtxo, contract.unlock.claimReward())
-		.addInputs(nonTokenUtxos, aliceSignatureTemplate.unlockP2PKH())
+		.addInputs(nonTokenUtxos, placeholderUnlocker)
 		.addOutput({
 			to: address,
 			amount: lockedUtxo.satoshis,
@@ -87,8 +83,7 @@ export const claimReward = async ({
 				},
 			},
 		})
-		.setLocktime(locktime)
-		.debug(); // Use block timestamp
+		.setLocktime(locktime); // Use block timestamp
 
 	// Add change output if there's enough BCH
 	const totalBchAmount = nonTokenUtxos.reduce(
@@ -107,8 +102,7 @@ export const claimReward = async ({
 		broadcast: false,
 	});
 
-	console.log("Runing claimReward funcation");
-	await provider.sendRawTransaction(result.signedTransaction).then(console.log);
+	await provider.sendRawTransaction(result.signedTransaction);
 
 	return {
 		txid: result.txid,

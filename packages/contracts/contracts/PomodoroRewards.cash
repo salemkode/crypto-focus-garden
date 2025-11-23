@@ -55,12 +55,10 @@ contract PomodoroRewards(
         // Using tx.locktime as the session start timestamp
         int time = tx.locktime;
         bytes ts = bytes(tx.locktime);
-        console.log(ts);
-        console.log(time);
+        bytes ts = bytes(tx.locktime);
         bytes expectedCommitment = 0x01 + tx.inputs[1].lockingBytecode + ts;
 
         bytes commitment = tx.outputs[1].nftCommitment;
-        console.log(commitment, expectedCommitment);
         require(commitment == expectedCommitment);
 
         // Ensure no other outputs (index >= 2) contain tokens or same covenant bytecode
@@ -115,7 +113,6 @@ contract PomodoroRewards(
         // Output 0: Send NFT to user
         bytes32 out0Cat = tx.outputs[0].tokenCategory.split(32)[0];
 
-        console.log(out0Cat, categoryId);
         require(out0Cat == categoryId);
         require(tx.outputs[0].tokenAmount == 0);            // NFT
         require(tx.outputs[0].value == tx.inputs[0].value); // preserve BCH amount

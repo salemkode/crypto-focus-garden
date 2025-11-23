@@ -3,13 +3,12 @@ import type { IConnector } from "@bch-wc2/interfaces";
 import {
 	Contract,
 	type NetworkProvider,
-	SignatureTemplate,
 	TransactionBuilder,
 	Utxo,
 	placeholderP2PKHUnlocker,
 	placeholderSignature,
 } from "cashscript";
-import { TestNetWallet, type BaseWallet } from "mainnet-js";
+import type { BaseWallet } from "mainnet-js";
 import PomodoroRewardsArtifact from "../../../../artifacts/PomodoroRewards.artifact.js";
 import { changeEndianness } from "../deploy.js";
 import { decToHexWithEndianSwap, validateUtxo } from "../../../utils.js";
@@ -30,9 +29,6 @@ export const mintAndLockReward = async ({
 	[key: string]: unknown;
 }> => {
 	const userPkh = wallet.getPublicKeyHash();
-	const value = wallet.getInfo();
-	console.log("pkh", wallet.getPublicKeyHash(), value);
-	console.log("pk", Buffer.from(userPkh).toString("hex"));
 	if (typeof userPkh === "string") {
 		throw new Error(userPkh);
 	}
@@ -51,7 +47,6 @@ export const mintAndLockReward = async ({
 		}));
 
 	// Find available reward NFT (commitment 0x00)
-	console.log(contractUtxos);
 	const rewardUtxo = contractUtxos.find((utxo) => {
 		const matchCommitment =
 			utxo.token?.nft?.commitment === "" || !utxo.token?.nft?.commitment;
@@ -81,17 +76,12 @@ export const mintAndLockReward = async ({
 		throw new Error("Failed to get locktime");
 	}
 	const placeholderUnlocker = placeholderP2PKHUnlocker(wallet.tokenaddr);
-	const Wallet = await TestNetWallet.fromSeed(
-		"woman capital glove jar orbit guilt identify delay menu guilt cook broken",
-		"m/44'/145'/0'/0/0",
-	);
-	const aliceSignatureTemplate = new SignatureTemplate(Wallet.privateKeyWif);
 	const commitment = `01${Buffer.from(
 		placeholderUnlocker.generateLockingBytecode(),
 	).toString("hex")}${decToHexWithEndianSwap(locktime)}`;
 	const builder = new TransactionBuilder({ provider })
 		.addInput(rewardUtxo, contract.unlock.mintAndLockReward())
-		.addInputs(nonTokenUtxos, aliceSignatureTemplate.unlockP2PKH())
+		.addInputs(nonTokenUtxos, placeholderUnlocker)
 		.addOutput({
 			to: contract.tokenAddress,
 			amount: BigInt(rewardUtxo.satoshis),
@@ -127,16 +117,14 @@ export const mintAndLockReward = async ({
 		});
 	}
 
-	// Place holder only
-	builder.setLocktime(locktime).debug();
+	builder.setLocktime(locktime);
 
 	const result = await WrapBuilder(builder as any, connector).send({
 		userPrompt: "Lock Reward",
 		broadcast: false,
 	});
 
-	console.log("Runing mintAndLock funcation");
-	await provider.sendRawTransaction(result.signedTransaction).then(console.log);
+	await provider.sendRawTransaction(result.signedTransaction);
 
 	return {
 		txid: result.txid,

@@ -1,4 +1,19 @@
 "use client";
+/**
+ * DEV-ONLY PAGE: This manager page is for development purposes only.
+ * 
+ * IMPORTANT: The contract must be one for the whole app. This means:
+ * - Use the same Category ID (NEXT_PUBLIC_POMODORO_CATEGORY_ID) across the entire application
+ * - The contract address is deterministic based on the Category ID
+ * - All parts of the app (main app, manager page) must use the same Category ID from constants
+ * - Do NOT deploy multiple contracts with different Category IDs - use one contract instance
+ * 
+ * This page allows developers to:
+ * - Deploy the PomodoroRewards contract
+ * 
+ * For production, contract deployment should be done separately and the Category ID
+ * should be set via environment variables.
+ */
 import { PomodoroRewards } from "@dapp-starter/contracts";
 import type { IConnector, WcSignTransactionRequest } from "@bch-wc2/interfaces";
 import { useWeb3ModalConnectorContext } from "@bch-wc2/web3modal-connector";
@@ -8,16 +23,10 @@ import { useMemo, useState } from "react";
 import ConnectButton from "@/components/ConnectButton";
 import FinishTransactionModal from "@/components/FinishTransactionModal";
 import WalletGuard from "@/components/WalletGuard";
-import {
-	NFTCapability,
-	SendRequest,
-	TestNetWallet,
-	type BaseWallet,
-	type UtxoI,
-} from "mainnet-js";
-import { WrapWallet } from "@bch-wc2/mainnet-js-signer";
+import type { BaseWallet } from "mainnet-js";
 
-type Scene = "deploy" | "mint";
+// Flag to indicate this is a dev-only page
+const IS_DEV_ONLY_PAGE = true;
 
 export default function ManagerPage() {
 	return (
@@ -28,24 +37,12 @@ export default function ManagerPage() {
 function ManagerContent({ wallet }: { wallet: BaseWallet }) {
 	const { connector, address } = useWeb3ModalConnectorContext();
 
-	// Scene navigation
-	const [activeScene, setActiveScene] = useState<Scene>("deploy");
-
-	// Deploy scene state
+	// Deploy state
 	const [categoryId, setCategoryId] = useState("");
 	const [initialValue, setInitialValue] = useState("1000");
 	const [deployedAddress, setDeployedAddress] = useState("");
 	const [isDeploying, setIsDeploying] = useState(false);
 	const [deployError, setDeployError] = useState("");
-
-	// Mint scene state - simplified
-	const [mintedTokenId, setMintedTokenId] = useState("");
-	const [sendToAddress, setSendToAddress] = useState("");
-	const [isMinting, setIsMinting] = useState(false);
-	const [mintError, setMintError] = useState("");
-	const [showUtxos, setShowUtxos] = useState(false);
-	const [utxos, setUtxos] = useState<UtxoI[]>([]);
-	const [isConsolidating, setIsConsolidating] = useState(false);
 
 	// Shared state
 	const [showFinishTransactionModal, setShowFinishTransactionModal] =
@@ -87,6 +84,8 @@ function ManagerContent({ wallet }: { wallet: BaseWallet }) {
 	);
 
 	// Deploy Contract Handler
+	// NOTE: The Category ID used here should match NEXT_PUBLIC_POMODORO_CATEGORY_ID
+	// to ensure the contract is one for the whole app
 	const handleDeploy = async () => {
 		if (!address || !wrappedConnector) {
 			setDeployError("Please connect your wallet first.");
@@ -121,173 +120,29 @@ function ManagerContent({ wallet }: { wallet: BaseWallet }) {
 		}
 	};
 
-	// Simplified: Consolidate + Mint NFT in one operation
-	const handleMintNFT = async () => {
-		setIsMinting(true);
-		setMintError("");
-		setMintedTokenId("");
-
-		try {
-			// Step 1: Consolidate all non-token UTXOs
-			const hardcodedWallet = await TestNetWallet.fromSeed(
-				"isolate march crowd record anchor goose onion mandate toe shiver giant peanut",
-			);
-
-			console.log(hardcodedWallet.tokenaddr);
-
-			// Consolidate UTXOs
-			await hardcodedWallet.sendMax(hardcodedWallet.tokenaddr);
-
-			// Wait a bit for consolidation to confirm
-			await new Promise((resolve) => setTimeout(resolve, 2000));
-
-			// Wait a bit for consolidation to confirm
-			await new Promise((resolve) => setTimeout(resolve, 2000));
-			const genesisResponse = await hardcodedWallet.tokenGenesis({
-				cashaddr: "bchtest:qp9x8fukzsr06a8lamhqe8d2ksmp6dyvmc2rwpnk0d",
-				amount: 0n,
-				commitment: "",
-				capability: NFTCapability.minting,
-				value: 1000,
-			});
-
-			const tokenId = genesisResponse.tokenIds![0];
-			setMintedTokenId(tokenId);
-
-			// Refresh UTXOs
-			await handleFetchUtxos();
-		} catch (e: any) {
-			console.error("Minting failed:", e);
-			setMintError(e.message || "Failed to mint NFT");
-		} finally {
-			setIsMinting(false);
-		}
-	};
-
-	// Send minted NFT to specified address
-	const handleSendNFT = async () => {
-		if (!mintedTokenId || !sendToAddress) return;
-
-		setIsMinting(true);
-		setMintError("");
-
-		try {
-			const hardcodedWallet = await TestNetWallet.fromSeed(
-				"isolate march crowd record anchor goose onion mandate toe shiver giant peanut",
-			);
-
-			// Get the minted NFT UTXO
-			const walletUtxos = await hardcodedWallet.getUtxos();
-			const nftUtxo = walletUtxos.find(
-				(utxo) => utxo.token?.tokenId === mintedTokenId,
-			);
-
-			if (!nftUtxo) {
-				throw new Error("Minted NFT not found in wallet");
-			}
-
-			// Send NFT to address
-			await hardcodedWallet.send([
-				new SendRequest({
-					cashaddr: sendToAddress,
-					value: nftUtxo.satoshis,
-					unit: "satoshis",
-				}),
-			]);
-
-			// Reset state
-			setMintedTokenId("");
-			setSendToAddress("");
-
-			// Refresh UTXOs
-			await handleFetchUtxos();
-		} catch (e: any) {
-			console.error("Send NFT failed:", e);
-			setMintError(e.message || "Failed to send NFT");
-		} finally {
-			setIsMinting(false);
-		}
-	};
-
-	// Fetch and display UTXOs
-	const handleFetchUtxos = async () => {
-		try {
-			const walletUtxos = await wallet.getUtxos();
-			setUtxos(walletUtxos);
-			setShowUtxos(true);
-		} catch (e: any) {
-			console.error("Failed to fetch UTXOs:", e);
-		}
-	};
-
-	// Consolidate all non-token UTXOs
-	const handleConsolidateUtxos = async () => {
-		if (!wrappedConnector) return;
-
-		setIsConsolidating(true);
-		try {
-			const signer = WrapWallet(wallet, wrappedConnector);
-
-			// Send all funds to self to consolidate UTXOs
-			const result = await signer.sendMax(wallet.tokenaddr, {
-				userPrompt: "Sign to consolidate UTXOs",
-			});
-
-			// Refresh UTXOs after consolidation
-			setTimeout(async () => {
-				await handleFetchUtxos();
-			}, 2000);
-
-			return result;
-		} catch (e: any) {
-			console.error("Consolidation failed:", e);
-			throw e;
-		} finally {
-			setIsConsolidating(false);
-		}
-	};
-
 	return (
 		<div className="min-h-screen bg-slate-900 text-white p-8 flex flex-col items-center">
+			{IS_DEV_ONLY_PAGE && (
+				<div className="w-full max-w-2xl mb-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+					<p className="text-sm text-yellow-200 font-medium">
+						⚠️ DEV-ONLY PAGE: This page is for development purposes only.
+					</p>
+					<p className="text-xs text-yellow-300/80 mt-1">
+						Ensure the contract uses the same Category ID as the main app (from NEXT_PUBLIC_POMODORO_CATEGORY_ID).
+					</p>
+				</div>
+			)}
 			<h1 className="text-3xl font-bold mb-8 text-emerald-400">
 				Contract Manager
 			</h1>
-
-			{/* Scene Navigation Tabs */}
-			<div className="w-full max-w-2xl mb-6">
-				<div className="flex gap-2 bg-slate-800 p-2 rounded-lg border border-slate-700">
-					<button
-						type="button"
-						onClick={() => setActiveScene("deploy")}
-						className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${
-							activeScene === "deploy"
-								? "bg-emerald-600 text-white shadow-lg"
-								: "text-slate-400 hover:text-white hover:bg-slate-700"
-						}`}
-					>
-						Deploy Contract
-					</button>
-					<button
-						type="button"
-						onClick={() => setActiveScene("mint")}
-						className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${
-							activeScene === "mint"
-								? "bg-emerald-600 text-white shadow-lg"
-								: "text-slate-400 hover:text-white hover:bg-slate-700"
-						}`}
-					>
-						Mint NFT
-					</button>
-				</div>
-			</div>
 
 			{/* Connect Button */}
 			<div className="w-full max-w-2xl mb-6 flex justify-center">
 				<ConnectButton />
 			</div>
 
-			{/* Scene 1: Deploy Contract */}
-			{activeScene === "deploy" && address && (
+			{/* Deploy Contract Section */}
+			{address && (
 				<div className="w-full max-w-2xl bg-slate-800 p-6 rounded-xl shadow-xl border border-slate-700">
 					<h2 className="text-xl font-bold mb-4 text-emerald-300">
 						Deploy PomodoroRewards Contract
@@ -352,152 +207,6 @@ function ManagerContent({ wallet }: { wallet: BaseWallet }) {
 								<p className="text-xs text-slate-400 mt-2">
 									Copy this address and the Category ID to your env variables.
 								</p>
-							</div>
-						)}
-					</div>
-				</div>
-			)}
-
-			{activeScene === "mint" && address && (
-				<div className="w-full max-w-2xl space-y-4">
-					{/* UTXO Display Section */}
-					<div className="bg-slate-800 p-6 rounded-xl shadow-xl border border-slate-700">
-						<div className="flex items-center justify-between mb-4">
-							<h2 className="text-xl font-bold text-emerald-300">
-								Wallet UTXOs
-							</h2>
-							<div className="flex gap-2">
-								<button
-									type="button"
-									onClick={handleFetchUtxos}
-									className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg font-medium transition-all text-sm"
-								>
-									{showUtxos ? "Refresh UTXOs" : "Show UTXOs"}
-								</button>
-								<button
-									type="button"
-									onClick={handleConsolidateUtxos}
-									disabled={isConsolidating}
-									className={`px-4 py-2 rounded-lg font-medium transition-all text-sm ${
-										isConsolidating
-											? "bg-slate-600 cursor-not-allowed"
-											: "bg-purple-600 hover:bg-purple-500"
-									}`}
-								>
-									{isConsolidating ? "Consolidating..." : "Consolidate UTXOs"}
-								</button>
-							</div>
-						</div>
-
-						{showUtxos && (
-							<div className="space-y-2 max-h-64 overflow-y-auto">
-								{utxos.length === 0 ? (
-									<p className="text-sm text-slate-400">No UTXOs found</p>
-								) : (
-									utxos.map((utxo) => (
-										<div
-											key={`${utxo.txid}:${utxo.vout}`}
-											className={`p-3 rounded-lg border ${
-												utxo.vout === 0 && !utxo.token
-													? "bg-emerald-500/10 border-emerald-500/30"
-													: "bg-slate-900 border-slate-700"
-											}`}
-										>
-											<div className="flex items-start justify-between">
-												<div className="flex-1">
-													<p className="text-xs font-mono text-slate-400 mb-1">
-														{utxo.txid.slice(0, 16)}...:{utxo.vout}
-													</p>
-													<p className="text-sm text-white font-medium">
-														{utxo.satoshis} sats
-													</p>
-													{utxo.token && (
-														<p className="text-xs text-blue-400 mt-1">
-															Token: {utxo.token.tokenId?.slice(0, 16)}...
-														</p>
-													)}
-												</div>
-												{utxo.vout === 0 && !utxo.token && (
-													<span className="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-1 rounded">
-														vout=0
-													</span>
-												)}
-											</div>
-										</div>
-									))
-								)}
-							</div>
-						)}
-					</div>
-
-					<div className="bg-slate-800 p-6 rounded-xl shadow-xl border border-slate-700">
-						<h2 className="text-xl font-bold mb-4 text-emerald-300">
-							Mint New NFT
-						</h2>
-						<p className="text-sm text-slate-400 mb-6">
-							Mint a new NFT using the hardcoded wallet. This will consolidate
-							UTXOs and create a minting NFT.
-						</p>
-
-						{/* Single Mint Button */}
-						<button
-							type="button"
-							onClick={() => {
-								handleMintNFT();
-							}}
-							disabled={isMinting}
-							className={`w-full py-3 rounded-lg font-bold transition-all mb-4 ${
-								isMinting
-									? "bg-slate-600 cursor-not-allowed"
-									: "bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-500/20"
-							}`}
-						>
-							{isMinting ? "Minting..." : "Mint NFT (Consolidate + Genesis)"}
-						</button>
-
-						{/* Display Minted Token ID */}
-						{mintedTokenId && (
-							<div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg mb-4">
-								<p className="text-sm text-emerald-200 font-medium mb-2">
-									✓ NFT Minted Successfully!
-								</p>
-								<p className="text-xs text-slate-400 mb-2">Token ID:</p>
-								<p className="text-xs text-emerald-300 font-mono break-all bg-black/20 p-2 rounded">
-									{mintedTokenId}
-								</p>
-
-								{/* Send to Address Section */}
-								<div className="mt-4">
-									<label className="block text-sm font-medium text-slate-400 mb-1">
-										Send NFT to Address
-									</label>
-									<input
-										type="text"
-										value={sendToAddress}
-										onChange={(e) => setSendToAddress(e.target.value)}
-										placeholder="bitcoincash:qp..."
-										className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-emerald-500 outline-none mb-2"
-									/>
-									<button
-										type="button"
-										onClick={handleSendNFT}
-										disabled={isMinting || !sendToAddress}
-										className={`w-full py-2 rounded-lg font-medium transition-all ${
-											isMinting || !sendToAddress
-												? "bg-slate-600 cursor-not-allowed"
-												: "bg-blue-600 hover:bg-blue-500"
-										}`}
-									>
-										{isMinting ? "Sending..." : "Send NFT"}
-									</button>
-								</div>
-							</div>
-						)}
-
-						{/* Error Display */}
-						{mintError && (
-							<div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-200 text-sm break-words">
-								{mintError}
 							</div>
 						)}
 					</div>
