@@ -42,13 +42,13 @@ export default function RootLayout({
 			>
 				<Providers>
 					{children}
-					<div className="fixed bottom-6 left-6 hidden md:flex items-center gap-2 text-white/30 hover:text-white/80 transition-all duration-300 text-sm font-medium z-50">
-						<span>Built with ❤️ by</span>
+					<div className="fixed bottom-4 w-full lg:w-auto flex justify-center lg:justify-start lg:bottom-6 lg:left-6 items-center gap-2 text-white/30 hover:text-white/80 transition-all duration-300 text-sm font-medium z-50 pointer-events-none">
+						<span className="pointer-events-auto">Built with ❤️ by</span>
 						<a
 							href="https://salemkode.com"
 							target="_blank"
 							rel="noopener noreferrer"
-							className="hover:text-emerald-400 transition-colors"
+							className="hover:text-emerald-400 transition-colors pointer-events-auto"
 						>
 							salemkode.com
 						</a>

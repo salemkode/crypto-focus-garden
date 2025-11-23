@@ -170,7 +170,7 @@ export default function FocusTimer({
 					type="button"
 					onClick={resetTimer}
 					disabled={!isActive}
-					className="p-3 rounded-xl bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white border border-white/10 transition-all disabled:cursor-not-allowed disabled:opacity-10"
+					className="p-3 rounded-xl bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white border border-white/10 transition-all disabled:cursor-not-allowed disabled:opacity-20"
 					title="Reset Timer"
 				>
 					<svg
