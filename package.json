@@ -23,5 +23,8 @@
 		"@bitauth/libauth": "^3.0.0",
 		"cashscript": "^0.13.0-next.1",
 		"mainnet-js": "^2.7.31"
+	},
+	"devDependencies": {
+		"@types/node": "^24.10.1"
 	}
 }
