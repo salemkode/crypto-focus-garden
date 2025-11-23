@@ -102,7 +102,7 @@ contract PomodoroRewards(
         bytes lockingBytecode = data.split(25)[0];
 
         // Verify claiming user matches locked user
-        require(lockingBytecode == tx.inputs[0].lockingBytecode);
+        require(lockingBytecode == tx.outputs[0].lockingBytecode);
 
         // Check time delay: tx.locktime >= startTime + unlockDelay
         // int startTime = int(bytes(tsBytes));
@@ -114,15 +114,19 @@ contract PomodoroRewards(
 
         // Output 0: Send NFT to user
         bytes32 out0Cat = tx.outputs[0].tokenCategory.split(32)[0];
+
+        console.log(out0Cat, categoryId);
         require(out0Cat == categoryId);
         require(tx.outputs[0].tokenAmount == 0);            // NFT
         require(tx.outputs[0].value == tx.inputs[0].value); // preserve BCH amount
 
         // Ensure no other outputs contain tokens
-        int o = 1;
-        do {
-            require(tx.outputs[o].tokenCategory == 0x);
-            o = o + 1;
-        } while (o < tx.outputs.length);
+        if (tx.outputs.length > 1) {
+            int o = 1;
+            do {
+                require(tx.outputs[o].tokenCategory == 0x);
+                o = o + 1;
+            } while (o < tx.outputs.length);
+        }
     }
 }

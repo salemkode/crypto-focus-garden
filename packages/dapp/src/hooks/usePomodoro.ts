@@ -1,17 +1,17 @@
 import { PomodoroRewards } from "@dapp-starter/contracts";
 import { useWeb3ModalConnectorContext } from "@bch-wc2/web3modal-connector";
 import { decodeTransaction, hexToBin } from "@bitauth/libauth";
-import { ElectrumNetworkProvider } from "cashscript";
 import { useCallback, useMemo } from "react";
 import { POMODORO_CATEGORY_ID } from "../constants";
 import type { BaseWallet } from "mainnet-js";
 import type { IConnector } from "@bch-wc2/interfaces";
+import { getNetworkProvider } from "../network";
 
 console.log(POMODORO_CATEGORY_ID);
 export function usePomodoro(wallet?: BaseWallet, connector?: IConnector) {
 	const { address } = useWeb3ModalConnectorContext();
 
-	const provider = useMemo(() => new ElectrumNetworkProvider("chipnet"), []);
+	const provider = useMemo(() => getNetworkProvider(), []);
 
 	const checkUserHasUtxoVout0 = useCallback(async () => {
 		if (!address) return false;
@@ -31,7 +31,7 @@ export function usePomodoro(wallet?: BaseWallet, connector?: IConnector) {
 		}
 		const pomodoro = new PomodoroRewards({
 			wallet,
-			provider,
+			provider: provider as any,
 			connector,
 			categoryId: POMODORO_CATEGORY_ID,
 		});
@@ -90,7 +90,7 @@ export function usePomodoro(wallet?: BaseWallet, connector?: IConnector) {
 			// const pubkey = hexToBin(pubkeyHex);
 			const pomodoro = new PomodoroRewards({
 				wallet,
-				provider,
+				provider: provider as any,
 				connector,
 				categoryId: POMODORO_CATEGORY_ID,
 			});
@@ -106,7 +106,7 @@ export function usePomodoro(wallet?: BaseWallet, connector?: IConnector) {
 			const utxos = await provider.getUtxos(address);
 			const treeUtxos = utxos.filter(
 				(utxo) =>
-					utxo.token?.category === POMODORO_CATEGORY_ID &&
+					utxo.token?.tokenId === POMODORO_CATEGORY_ID &&
 					utxo.token?.amount === 0n, // NFTs have amount 0
 			);
 			return treeUtxos.length;
@@ -142,7 +142,7 @@ export function usePomodoro(wallet?: BaseWallet, connector?: IConnector) {
 			// But we can cast or mock.
 			const pomodoro = new PomodoroRewards({
 				wallet: wallet as BaseWallet, // Cast as we might not have it yet, but for address it might be fine?
-				provider,
+				provider: provider as any,
 				connector: connector as any, // Cast
 				categoryId: POMODORO_CATEGORY_ID,
 			});

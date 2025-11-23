@@ -14,6 +14,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 				config={{
 					projectId: "b89a472ca74470463e1c16f3f6bfba4f",
 					useChipnet: true,
+					desktopWallets: [],
 				}}
 			>
 				{children}

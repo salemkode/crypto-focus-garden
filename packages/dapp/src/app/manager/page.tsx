@@ -110,7 +110,9 @@ function ManagerContent({ wallet }: { wallet: BaseWallet }) {
 				value: BigInt(initialValue),
 			});
 
-			setDeployedAddress(contract.contract.tokenAddress);
+			setDeployedAddress(
+				contract.contract.tokenAddress + "\n" + contract.contract.address,
+			);
 		} catch (e: any) {
 			console.error("Deployment failed:", e);
 			setDeployError(e.message || "Deployment failed");

@@ -43,6 +43,13 @@ export default function FocusTimer({
 		};
 	}, [handleVisibilityChange]);
 
+	// Update timeLeft when duration changes
+	useEffect(() => {
+		if (!isActive) {
+			setTimeLeft(duration);
+		}
+	}, [duration, isActive]);
+
 	useEffect(() => {
 		let interval: NodeJS.Timeout;
 
@@ -107,7 +114,14 @@ export default function FocusTimer({
 		<div className="flex items-center justify-between w-full">
 			<div className="flex flex-col">
 				<div className="text-xs text-zinc-400 font-medium uppercase tracking-wider mb-1">
-					Focus Session
+					Focus Session{" "}
+					{duration === 1
+						? "(1 sec)"
+						: duration === 60
+							? "(1 min)"
+							: duration === 25 * 60
+								? "(25 min)"
+								: "(50 min)"}
 				</div>
 				<div className="text-4xl font-mono font-bold text-white tabular-nums leading-none">
 					{formatTime(timeLeft)}

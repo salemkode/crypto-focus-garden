@@ -2,12 +2,16 @@ import { useQuery } from "@tanstack/react-query";
 import { TestNetWallet as Wallet } from "mainnet-js";
 import { useEffect } from "react";
 
+import { getNetworkProvider } from "../network";
+
 export function useWatchAddress(address?: string, tokenId?: string) {
 	const { data: wallet } = useQuery({
 		queryKey: ["watchAddress", address],
 		queryFn: async () => {
 			if (!address) return null;
-			return await Wallet.watchOnly(address);
+			const w = await Wallet.watchOnly(address);
+			(w as any).provider = await getNetworkProvider();
+			return w;
 		},
 		enabled: !!address,
 	});

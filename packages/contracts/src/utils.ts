@@ -86,6 +86,51 @@ export const toCashScriptUtxo = (utxo: UtxoI) =>
 			: undefined,
 	}) as Utxo;
 
+export const validateUtxo = (utxo: Utxo | UtxoI): Utxo => {
+	const getTokenData = () => {
+		if (utxo.token && "tokenId" in utxo.token) {
+			const token = utxo.token as any;
+			return {
+				amount: BigInt(token.amount || 0),
+				category: token.tokenId,
+				nft:
+					token.capability || token.commitment
+						? {
+								capability: token.capability,
+								commitment: token.commitment,
+							}
+						: undefined,
+			} as TokenDetails;
+		}
+		return utxo.token;
+	};
+
+	return {
+		txid: utxo.txid,
+		vout: utxo.vout,
+		satoshis: BigInt(utxo.satoshis),
+		token: getTokenData(),
+	};
+};
+
+export const decToHexWithEndianSwap = (num: number, byteLength = 3): string => {
+	// حوّل لـ hex
+	let hex = num.toString(16);
+
+	// مثالنا 3 بايت = 6 حروف hex
+	if (hex.length > byteLength * 2) {
+		throw new Error("الرقم أكبر من الحجم المحدد بالبايتات");
+	}
+
+	// صفّر من اليسار لين يصير الطول مضبوط
+	hex = hex.padStart(byteLength * 2, "0"); // مثال: 280885 => "044935"
+
+	// اعكس ترتيب البايتات
+	const reversedHex = hex.match(/../g)!.reverse().join(""); // "354904"
+
+	return reversedHex;
+};
+
 export const consolidateUtxos = async ({
 	signer,
 	minSatoshis,
