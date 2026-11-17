@@ -1,0 +1,667 @@
+diff --git a/android/src/main/java/com/margelo/filament/FilamentProxy.java b/android/src/main/java/com/margelo/filament/FilamentProxy.java
+index cc43513..53db903 100644
+--- a/android/src/main/java/com/margelo/filament/FilamentProxy.java
++++ b/android/src/main/java/com/margelo/filament/FilamentProxy.java
+@@ -58,7 +58,8 @@ class FilamentProxy {
+             throw new RuntimeException("Failed to initialize react-native-filament: JSI Runtime Holder is null!");
+         }
+         long runtimePointer = jsRuntimeHolder.get();
+-        CallInvokerHolder callInvokerHolder = context.getCatalystInstance().getJSCallInvokerHolder();
++        // React Native 0.88 (bridgeless): CatalystInstance may be unavailable; the context exposes the invoker.
++        CallInvokerHolder callInvokerHolder = context.getJSCallInvokerHolder();
+         if (!(callInvokerHolder instanceof CallInvokerHolderImpl)) {
+             throw new RuntimeException("Failed to initialize react-native-filament: JS Call Invoker is null!");
+         }
+diff --git a/android/src/main/java/com/margelo/filament/FilamentView.java b/android/src/main/java/com/margelo/filament/FilamentView.java
+index f7c15df..a2c9570 100644
+--- a/android/src/main/java/com/margelo/filament/FilamentView.java
++++ b/android/src/main/java/com/margelo/filament/FilamentView.java
+@@ -4,7 +4,12 @@ import android.content.Context;
+ import android.graphics.SurfaceTexture;
+ import android.util.AttributeSet;
+ import android.util.Log;
++import android.app.Activity;
++import android.os.Build;
++import android.view.Display;
+ import android.view.Surface;
++import android.view.Window;
++import android.view.WindowManager;
+ import android.view.TextureView;
+ import android.widget.FrameLayout;
+ 
+@@ -76,12 +81,54 @@ public class FilamentView extends FrameLayout implements TextureView.SurfaceText
+     @Override
+     protected void onAttachedToWindow() {
+         super.onAttachedToWindow();
++        requestHighRefreshRate();
+         if (!isMounted) {
+             isMounted = true;
+             onViewReady();
+         }
+     }
+ 
++    @Override
++    protected void onDetachedFromWindow() {
++        restoreRefreshRate();
++        super.onDetachedFromWindow();
++    }
++
++    // A TextureView is composited by the app window, so the window (not the surface) asks the
++    // display for its fastest mode at the current resolution while this view is attached.
++    private int previousDisplayModeId = -1;
++
++    private void requestHighRefreshRate() {
++        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
++        Activity activity = ((ThemedReactContext) getContext()).getCurrentActivity();
++        if (activity == null) return;
++        Window window = activity.getWindow();
++        Display display = activity.getWindowManager().getDefaultDisplay();
++        Display.Mode current = display.getMode();
++        Display.Mode best = current;
++        for (Display.Mode mode : display.getSupportedModes()) {
++            if (mode.getPhysicalWidth() == current.getPhysicalWidth() && mode.getPhysicalHeight() == current.getPhysicalHeight()
++                    && mode.getRefreshRate() > best.getRefreshRate()) {
++                best = mode;
++            }
++        }
++        WindowManager.LayoutParams params = window.getAttributes();
++        if (previousDisplayModeId < 0) previousDisplayModeId = params.preferredDisplayModeId;
++        params.preferredDisplayModeId = best.getModeId();
++        window.setAttributes(params);
++        Log.d(TAG, "Requested display mode " + best.getModeId() + " at " + best.getRefreshRate() + " Hz");
++    }
++
++    private void restoreRefreshRate() {
++        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || previousDisplayModeId < 0) return;
++        Activity activity = ((ThemedReactContext) getContext()).getCurrentActivity();
++        if (activity == null) return;
++        WindowManager.LayoutParams params = activity.getWindow().getAttributes();
++        params.preferredDisplayModeId = previousDisplayModeId;
++        activity.getWindow().setAttributes(params);
++        previousDisplayModeId = -1;
++    }
++
+     private void onViewReady() {
+         int surfaceId = UIManagerHelper.getSurfaceId(this);
+         FilamentViewReadyEvent event = new FilamentViewReadyEvent(surfaceId, getId());
+diff --git a/cpp/RNFChoreographer.h b/cpp/RNFChoreographer.h
+index 83813d0..ade2d1e 100644
+--- a/cpp/RNFChoreographer.h
++++ b/cpp/RNFChoreographer.h
+@@ -23,6 +23,9 @@ public:
+ 
+   virtual void start() = 0;
+   virtual void stop() = 0;
++  // Focus Garden patch: asks for a display rate (frames per second); 0 or less restores the default.
++  // Platforms that cannot honour it ignore it.
++  virtual void setFrameRate(double fps) {}
+ 
+ protected:
+   void onFrame(double timestamp);
+diff --git a/cpp/RNFChoreographerWrapper.cpp b/cpp/RNFChoreographerWrapper.cpp
+index b8f9374..ee1bfb9 100644
+--- a/cpp/RNFChoreographerWrapper.cpp
++++ b/cpp/RNFChoreographerWrapper.cpp
+@@ -15,6 +15,7 @@ ChoreographerWrapper::~ChoreographerWrapper() {
+ void ChoreographerWrapper::loadHybridMethods() {
+   registerHybridMethod("start", &ChoreographerWrapper::start, this);
+   registerHybridMethod("stop", &ChoreographerWrapper::stop, this);
++  registerHybridMethod("setFrameRate", &ChoreographerWrapper::setFrameRate, this);
+   registerHybridMethod("addFrameCallbackListener", &ChoreographerWrapper::addFrameCallbackListener, this);
+   registerHybridMethod("release", &ChoreographerWrapper::release, this, true);
+ }
+@@ -31,6 +32,12 @@ void ChoreographerWrapper::stop() {
+   pointee()->stop();
+ }
+ 
++void ChoreographerWrapper::setFrameRate(double fps) {
++  std::unique_lock lock(_mutex);
++
++  pointee()->setFrameRate(fps);
++}
++
+ std::shared_ptr<Listener> ChoreographerWrapper::addFrameCallbackListener(RenderCallback onFrameCallback) {
+   std::unique_lock lock(_mutex);
+ 
+diff --git a/cpp/RNFChoreographerWrapper.h b/cpp/RNFChoreographerWrapper.h
+index cb7d862..b24842f 100644
+--- a/cpp/RNFChoreographerWrapper.h
++++ b/cpp/RNFChoreographerWrapper.h
+@@ -27,6 +27,7 @@ protected:
+ private: // Exposed JS API
+   void start();
+   void stop();
++  void setFrameRate(double fps);
+   std::shared_ptr<Listener> addFrameCallbackListener(RenderCallback onFrameCallback);
+   void release() override;
+ 
+diff --git a/cpp/core/RNFTransformManagerImpl.cpp b/cpp/core/RNFTransformManagerImpl.cpp
+index dc36c4d..a1ab4ec 100644
+--- a/cpp/core/RNFTransformManagerImpl.cpp
++++ b/cpp/core/RNFTransformManagerImpl.cpp
+@@ -46,6 +46,24 @@ void TransformManagerImpl::setTransform(Entity entity, std::shared_ptr<TMat44Wra
+   transformManager.setTransform(instance, mat);
+ }
+ 
++void TransformManagerImpl::setTransforms(const std::vector<Entity>& entities, const float* matrices, size_t count) {
++  if (count < entities.size() * 16) {
++    throw std::invalid_argument("setTransforms: expected " + std::to_string(entities.size() * 16) + " floats, got " + std::to_string(count));
++  }
++  std::unique_lock lock(_mutex);
++  TransformManager& transformManager = _engine->getTransformManager();
++  transformManager.openLocalTransformTransaction();
++  for (size_t i = 0; i < entities.size(); i++) {
++    TransformManager::Instance instance = transformManager.getInstance(entities[i]);
++    if (!instance.isValid()) continue;
++    const float* m = matrices + i * 16;
++    math::mat4f mat(math::float4(m[0], m[1], m[2], m[3]), math::float4(m[4], m[5], m[6], m[7]), math::float4(m[8], m[9], m[10], m[11]),
++                    math::float4(m[12], m[13], m[14], m[15]));
++    transformManager.setTransform(instance, mat);
++  }
++  transformManager.commitLocalTransformTransaction();
++}
++
+ std::shared_ptr<TMat44Wrapper> TransformManagerImpl::createIdentityMatrix() {
+   return std::make_shared<TMat44Wrapper>(math::mat4f::scaling(1));
+ }
+diff --git a/cpp/core/RNFTransformManagerImpl.h b/cpp/core/RNFTransformManagerImpl.h
+index 3a7e4c7..ac150da 100644
+--- a/cpp/core/RNFTransformManagerImpl.h
++++ b/cpp/core/RNFTransformManagerImpl.h
+@@ -23,6 +23,8 @@ public:
+   void openLocalTransformTransaction();
+   void commitLocalTransformTransaction();
+   void setTransform(Entity entity, std::shared_ptr<TMat44Wrapper> transform);
++  // Sets the local transform of each entity from `matrices` (16 column-major floats per entity).
++  void setTransforms(const std::vector<Entity>& entities, const float* matrices, size_t count);
+   std::shared_ptr<TMat44Wrapper> createIdentityMatrix();
+   void setEntityPosition(Entity entity, std::vector<double> positionVec, bool multiplyCurrent);
+   void setEntityRotation(Entity entity, double angleRadians, std::vector<double> axisVec, bool multiplyCurrent);
+diff --git a/cpp/core/RNFTransformManagerWrapper.cpp b/cpp/core/RNFTransformManagerWrapper.cpp
+index 803a76a..45de78e 100644
+--- a/cpp/core/RNFTransformManagerWrapper.cpp
++++ b/cpp/core/RNFTransformManagerWrapper.cpp
+@@ -12,6 +12,7 @@ void TransformManagerWrapper::loadHybridMethods() {
+   registerHybridMethod("openLocalTransformTransaction", &TransformManagerWrapper::openLocalTransformTransaction, this);
+   registerHybridMethod("commitLocalTransformTransaction", &TransformManagerWrapper::commitLocalTransformTransaction, this);
+   registerHybridMethod("setTransform", &TransformManagerWrapper::setTransform, this);
++  registerHybridMethod("setTransforms", &TransformManagerWrapper::setTransforms, this);
+   registerHybridMethod("createIdentityMatrix", &TransformManagerWrapper::createIdentityMatrix, this);
+   registerHybridMethod("setEntityPosition", &TransformManagerWrapper::setEntityPosition, this);
+   registerHybridMethod("setEntityRotation", &TransformManagerWrapper::setEntityRotation, this);
+@@ -73,6 +74,15 @@ void TransformManagerWrapper::transformToUnitCube(std::shared_ptr<EntityWrapper>
+   pointee()->transformToUnitCube(rootEntity, aabb);
+ }
+ 
++void TransformManagerWrapper::setTransforms(std::vector<std::shared_ptr<EntityWrapper>> entityWrappers, Float32Span matrices) {
++  std::vector<Entity> entities;
++  entities.reserve(entityWrappers.size());
++  for (const auto& wrapper : entityWrappers) {
++    entities.push_back(getEntity(wrapper));
++  }
++  pointee()->setTransforms(entities, matrices.data, matrices.size);
++}
++
+ Entity TransformManagerWrapper::getEntity(std::shared_ptr<EntityWrapper> entityWrapper) {
+   if (!entityWrapper) {
+     [[unlikely]];
+diff --git a/cpp/core/RNFTransformManagerWrapper.h b/cpp/core/RNFTransformManagerWrapper.h
+index b9e8923..bbe1ecf 100644
+--- a/cpp/core/RNFTransformManagerWrapper.h
++++ b/cpp/core/RNFTransformManagerWrapper.h
+@@ -22,6 +22,7 @@ private: // Exposed JS API:
+   void openLocalTransformTransaction();
+   void commitLocalTransformTransaction();
+   void setTransform(std::shared_ptr<EntityWrapper> entityWrapper, std::shared_ptr<TMat44Wrapper> transform);
++  void setTransforms(std::vector<std::shared_ptr<EntityWrapper>> entityWrappers, Float32Span matrices);
+   std::shared_ptr<TMat44Wrapper> createIdentityMatrix();
+   void setEntityPosition(std::shared_ptr<EntityWrapper> entity, std::vector<double> positionVec, bool multiplyCurrent);
+   void setEntityRotation(std::shared_ptr<EntityWrapper> entity, double angleRadians, std::vector<double> axisVec, bool multiplyCurrent);
+diff --git a/cpp/jsi/RNFJSIConverter.h b/cpp/jsi/RNFJSIConverter.h
+index 686003f..90bf9ae 100644
+--- a/cpp/jsi/RNFJSIConverter.h
++++ b/cpp/jsi/RNFJSIConverter.h
+@@ -266,6 +266,32 @@ template <typename ElementType> struct JSIConverter<std::vector<ElementType>> {
+   }
+ };
+ 
++// Float32Array / ArrayBuffer <> Float32Span, read in place: valid only during the native call.
++// (Added for TransformManager.setTransforms, so a frame's matrices cross JSI as one buffer.)
++struct Float32Span {
++  const float* data = nullptr;
++  size_t size = 0;
++};
++template <> struct JSIConverter<Float32Span> {
++  static Float32Span fromJSI(jsi::Runtime& runtime, const jsi::Value& arg) {
++    jsi::Object object = arg.asObject(runtime);
++    if (object.isArrayBuffer(runtime)) {
++      jsi::ArrayBuffer buffer = object.getArrayBuffer(runtime);
++      return {reinterpret_cast<const float*>(buffer.data(runtime)), buffer.size(runtime) / sizeof(float)};
++    }
++    size_t offset = static_cast<size_t>(object.getProperty(runtime, "byteOffset").asNumber());
++    size_t length = static_cast<size_t>(object.getProperty(runtime, "byteLength").asNumber());
++    jsi::ArrayBuffer buffer = object.getProperty(runtime, "buffer").asObject(runtime).getArrayBuffer(runtime);
++    if (offset % sizeof(float) != 0 || offset + length > buffer.size(runtime)) {
++      throw std::invalid_argument("Float32Span: misaligned or out-of-range typed array");
++    }
++    return {reinterpret_cast<const float*>(buffer.data(runtime) + offset), length / sizeof(float)};
++  }
++  static jsi::Value toJSI(jsi::Runtime&, const Float32Span&) {
++    throw std::runtime_error("Float32Span cannot be returned to JavaScript");
++  }
++};
++
+ // std::unordered_map<std::string, T> <> Record<string, T>
+ template <typename ValueType> struct JSIConverter<std::unordered_map<std::string, ValueType>> {
+   static std::unordered_map<std::string, ValueType> fromJSI(jsi::Runtime& runtime, const jsi::Value& arg) {
+diff --git a/ios/src/RNFAppleChoreographer.h b/ios/src/RNFAppleChoreographer.h
+index 4e84c5a..874ff45 100644
+--- a/ios/src/RNFAppleChoreographer.h
++++ b/ios/src/RNFAppleChoreographer.h
+@@ -19,6 +19,7 @@ public:
+ 
+   void stop() override;
+   void start() override;
++  void setFrameRate(double fps) override;
+ 
+ private:
+   DisplayLinkListener* _displayLink;
+diff --git a/ios/src/RNFAppleChoreographer.mm b/ios/src/RNFAppleChoreographer.mm
+index d3f19d4..84c4590 100644
+--- a/ios/src/RNFAppleChoreographer.mm
++++ b/ios/src/RNFAppleChoreographer.mm
+@@ -30,4 +30,8 @@ void AppleChoreographer::start() {
+   [_displayLink start];
+ }
+ 
++void AppleChoreographer::setFrameRate(double fps) {
++  [_displayLink setFrameRate:fps];
++}
++
+ } // namespace margelo
+diff --git a/ios/src/RNFDisplayLinkListener.h b/ios/src/RNFDisplayLinkListener.h
+index 163610d..45c7630 100644
+--- a/ios/src/RNFDisplayLinkListener.h
++++ b/ios/src/RNFDisplayLinkListener.h
+@@ -16,6 +16,9 @@ typedef void (^OnFrameCallback)(double timestamp);
+ - (instancetype)initWithCallback:(OnFrameCallback)callback;
+ - (void)start;
+ - (void)stop;
++/// Focus Garden patch: preferred display rate in frames per second; 0 or less restores 80–120 Hz.
++/// Safe from any thread: the change is applied on the display link's own run-loop thread.
++- (void)setFrameRate:(double)fps;
+ - (void)invalidate;
+ - (void)onFrame:(CADisplayLink*)displayLink;
+ 
+diff --git a/ios/src/RNFDisplayLinkListener.m b/ios/src/RNFDisplayLinkListener.m
+index 3ed7315..4cb24b2 100644
+--- a/ios/src/RNFDisplayLinkListener.m
++++ b/ios/src/RNFDisplayLinkListener.m
+@@ -13,13 +13,22 @@
+   CADisplayLink* _Nullable _displayLink;
+   OnFrameCallback _callback;
+   bool shouldContinueOnEnterForeground;
++  NSThread* _thread;
++  double _frameRate;
+ }
+ - (instancetype)initWithCallback:(OnFrameCallback)callback {
+   if (self = [super init]) {
+     _callback = callback;
+     _displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(onFrame:)];
+     _displayLink.paused = YES;
++    // ProMotion: ask for up to 120 Hz (needs CADisableMinimumFrameDurationOnPhone in Info.plist).
++    // The system may still lower it (Low Power Mode, thermal state).
++    if (@available(iOS 15.0, *)) {
++      _displayLink.preferredFrameRateRange = CAFrameRateRangeMake(80, 120, 120);
++    }
+     shouldContinueOnEnterForeground = NO;
++    _thread = [NSThread currentThread];
++    _frameRate = 0;
+     [_displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
+ 
+     [[NSNotificationCenter defaultCenter] addObserver:self
+@@ -42,6 +51,20 @@
+   _displayLink.paused = YES;
+ }
+ 
++- (void)setFrameRate:(double)fps {
++  if (fps == _frameRate) return;
++  _frameRate = fps;
++  [self performSelector:@selector(applyFrameRate:) onThread:_thread withObject:@(fps) waitUntilDone:NO];
++}
++
++- (void)applyFrameRate:(NSNumber*)fps {
++  if (_displayLink == nil) return;
++  if (@available(iOS 15.0, *)) {
++    float rate = fps.floatValue;
++    _displayLink.preferredFrameRateRange = rate > 0 ? CAFrameRateRangeMake(rate, rate, rate) : CAFrameRateRangeMake(80, 120, 120);
++  }
++}
++
+ - (void)invalidate {
+   [[NSNotificationCenter defaultCenter] removeObserver:self];
+   [_displayLink invalidate];
+diff --git a/ios/src/RNFFilamentInstaller.mm b/ios/src/RNFFilamentInstaller.mm
+index af9f548..90875cc 100644
+--- a/ios/src/RNFFilamentInstaller.mm
++++ b/ios/src/RNFFilamentInstaller.mm
+@@ -11,7 +11,6 @@
+ #import <Foundation/Foundation.h>
+ #import <ReactCommon/CallInvoker.h>
+ 
+-#import <React/RCTBridge+Private.h>
+ #import <React/RCTBridge.h>
+ 
+ #import "threading/RNFCallInvokerDispatcher.h"
+@@ -20,11 +19,6 @@
+ using namespace facebook;
+ using namespace margelo;
+ 
+-// This is defined in RCTCxxBridge.mm, and we are technically using a private API here.
+-@interface RCTCxxBridge (CallInvoker)
+-- (std::shared_ptr<react::CallInvoker>)jsCallInvoker;
+-@end
+-
+ @implementation FilamentInstaller
+ 
+ #ifdef RCT_NEW_ARCH_ENABLED
+diff --git a/ios/src/RNFFilamentMetalView.mm b/ios/src/RNFFilamentMetalView.mm
+index 4ceb9fa..84021b6 100644
+--- a/ios/src/RNFFilamentMetalView.mm
++++ b/ios/src/RNFFilamentMetalView.mm
+@@ -37,7 +37,9 @@
+ 
+ - (void)layoutSubviews {
+   [super layoutSubviews];
+-  CGFloat scale = [UIScreen mainScreen].scale;
++  // At most 2 pixels per point: 3x phones render 44% fewer pixels; Core Animation scales the result.
++  // (Dynamic resolution is Android-only in Filament, so this is the iOS pixel budget.)
++  CGFloat scale = MIN([UIScreen mainScreen].scale, 2.0);
+   CGSize newSize = CGSizeMake(self.bounds.size.width * scale, self.bounds.size.height * scale);
+ 
+   // TODO: usually the setter function for drawableSize should be auto wrapped with
+diff --git a/ios/src/RNFFilamentModule.h b/ios/src/RNFFilamentModule.h
+index c6c4478..344b073 100644
+--- a/ios/src/RNFFilamentModule.h
++++ b/ios/src/RNFFilamentModule.h
+@@ -18,8 +18,9 @@
+ @end
+ 
+ #ifdef RCT_NEW_ARCH_ENABLED
++#import <ReactCommon/RCTTurboModuleWithJSIBindings.h>
+ #import <rnfilament/rnfilament.h>
+ 
+-@interface FilamentModule () <NativeFilamentModuleSpec>
++@interface FilamentModule () <NativeFilamentModuleSpec, RCTTurboModuleWithJSIBindings>
+ @end
+ #endif
+diff --git a/ios/src/RNFFilamentModule.mm b/ios/src/RNFFilamentModule.mm
+index 6078080..f8bca16 100644
+--- a/ios/src/RNFFilamentModule.mm
++++ b/ios/src/RNFFilamentModule.mm
+@@ -8,7 +8,6 @@
+ #import "RNFFilamentModule.h"
+ #import "RNFFilamentInstaller.h"
+ #import <Foundation/Foundation.h>
+-#import <React/RCTBridge+Private.h>
+ 
+ #ifndef RCT_NEW_ARCH_ENABLED
+ #import <React/RCTBridge.h>
+@@ -23,14 +22,12 @@
+ 
+ using namespace facebook;
+ 
+-@interface RCTBridge (JSIRuntime)
+-- (void*)runtime;
+-- (std::shared_ptr<react::CallInvoker>)jsCallInvoker;
+-@end
+-
+ @implementation FilamentModule {
+   __weak RCTSurfacePresenter* _surfacePresenter;
+-  BOOL _isBridgeless;
++  // React Native 0.88 removed RCTCxxBridge: the runtime and call invoker now arrive through
++  // RCTTurboModuleWithJSIBindings, on the JS thread, before JavaScript receives this module.
++  jsi::Runtime* _runtime;
++  std::shared_ptr<react::CallInvoker> _jsCallInvoker;
+ }
+ 
+ RCT_EXPORT_MODULE()
+@@ -41,33 +38,25 @@ RCT_EXPORT_MODULE()
+  */
+ - (void)setSurfacePresenter:(id<RCTSurfacePresenterStub>)surfacePresenter {
+   _surfacePresenter = surfacePresenter;
+-  _isBridgeless = true;
+ }
+ 
+-- (NSNumber*)install {
+-  jsi::Runtime* jsiRuntime = nullptr;
+-  std::shared_ptr<react::CallInvoker> jsCallInvoker = nullptr;
+-  if (_isBridgeless) {
+-    // If we are in bridgless mode we can cast directly to RCTCxxBridge to get our properties:
+-    RCTCxxBridge* cxxBridge = (RCTCxxBridge*)self.bridge;
+-    jsiRuntime = (jsi::Runtime*)cxxBridge.runtime;
+-    jsCallInvoker = cxxBridge.jsCallInvoker;
+-  } else {
+-    jsiRuntime = [self.bridge respondsToSelector:@selector(runtime)] ? reinterpret_cast<jsi::Runtime*>(self.bridge.runtime) : nullptr;
+-    jsCallInvoker = self.bridge.jsCallInvoker;
+-    _surfacePresenter = self.bridge.surfacePresenter;
+-  }
++- (void)installJSIBindingsWithRuntime:(jsi::Runtime&)runtime
++                          callInvoker:(const std::shared_ptr<react::CallInvoker>&)callInvoker {
++  _runtime = &runtime;
++  _jsCallInvoker = callInvoker;
++}
+ 
+-  if (jsiRuntime == nullptr) {
+-    NSLog(@"Failed to install react-native-filament: jsi::Runtime is nil (bridgless: %@)!", _isBridgeless ? @"YES" : @"NO");
++- (NSNumber*)install {
++  if (_runtime == nullptr) {
++    NSLog(@"Failed to install react-native-filament: jsi::Runtime is nil!");
+     return [NSNumber numberWithBool:NO];
+   }
+-  if (jsCallInvoker == nullptr) {
+-    NSLog(@"Failed to install react-native-filament: react::CallInvoker is nil (bridgless: %@)!", _isBridgeless ? @"YES" : @"NO");
++  if (_jsCallInvoker == nullptr) {
++    NSLog(@"Failed to install react-native-filament: react::CallInvoker is nil!");
+     return [NSNumber numberWithBool:NO];
+   }
+ 
+-  BOOL result = [FilamentInstaller installToBridge:jsiRuntime callInvoker:jsCallInvoker surfacePresenter:_surfacePresenter];
++  BOOL result = [FilamentInstaller installToBridge:_runtime callInvoker:_jsCallInvoker surfacePresenter:_surfacePresenter];
+   return [NSNumber numberWithBool:result];
+ }
+ 
+diff --git a/lib/typescript/react/FilamentViewWithRenderCallbacks.d.ts b/lib/typescript/react/FilamentViewWithRenderCallbacks.d.ts
+index 075d310..6483d50 100644
+--- a/lib/typescript/react/FilamentViewWithRenderCallbacks.d.ts
++++ b/lib/typescript/react/FilamentViewWithRenderCallbacks.d.ts
+@@ -5,6 +5,7 @@ import { ViewStyle } from 'react-native';
+ type ForwardProps = PublicNativeProps & {
+     style?: ViewStyle;
+     renderCallback?: RenderCallback;
++    paused?: boolean;
+ };
+ /**
+  * This is the component actually exposed to the user. It wraps the `FilamentView` and adds the renderCallbacks.
+diff --git a/lib/typescript/types/Choreographer.d.ts b/lib/typescript/types/Choreographer.d.ts
+index 0f0a992..c51e1dd 100644
+--- a/lib/typescript/types/Choreographer.d.ts
++++ b/lib/typescript/types/Choreographer.d.ts
+@@ -16,10 +16,11 @@ export type FrameInfo = {
+     /** Time in seconds since the last frame. */
+     timeSinceLastFrame: number;
+ };
+-export type RenderCallback = (frameInfo: FrameInfo) => void;
++export type RenderCallback = (frameInfo: FrameInfo) => void | boolean;
+ export interface Choreographer extends PointerHolder {
+     start(): void;
+     stop(): void;
++    setFrameRate?(fps: number): void;
+     addFrameCallbackListener(callback: RenderCallback): Listener;
+ }
+ //# sourceMappingURL=Choreographer.d.ts.map
+\ No newline at end of file
+diff --git a/lib/typescript/types/TransformManager.d.ts b/lib/typescript/types/TransformManager.d.ts
+index 4f0a709..07310e2 100644
+--- a/lib/typescript/types/TransformManager.d.ts
++++ b/lib/typescript/types/TransformManager.d.ts
+@@ -83,6 +83,11 @@ export interface TransformManager extends PointerHolder {
+      *            consider using openLocalTransformTransaction() / commitLocalTransformTransaction().
+      */
+     setTransform(entity: Entity, transform: Mat4): void;
++    /**
++     * Sets the local transform of many entities in one call: `matrices` holds 16 column-major
++     * floats per entity, in the same order as `entities`. Runs inside one local transform transaction.
++     */
++    setTransforms(entities: Entity[], matrices: Float32Array): void;
+     /**
+      * Creates a new identity matrix.
+      */
+diff --git a/src/react/FilamentView.tsx b/src/react/FilamentView.tsx
+index 69e85f3..fa3a495 100644
+--- a/src/react/FilamentView.tsx
++++ b/src/react/FilamentView.tsx
+@@ -22,6 +22,11 @@ export interface FilamentProps extends PublicNativeProps {
+    * @note Don't call any methods on `engine` here - this will lead to deadlocks!
+    */
+   renderCallback: RenderCallback
++  /**
++   * Stops the display link while true (nothing is drawn; the last frame stays on screen).
++   * (Focus Garden patch.)
++   */
++  paused?: boolean
+ }
+ 
+ type RefType = InstanceType<FilamentViewNativeType>
+@@ -104,7 +109,8 @@ export class FilamentView extends React.PureComponent<FilamentProps> {
+           }
+ 
+           try {
+-            callback(frameInfo)
++            // Focus Garden patch: a callback that returns false skips this frame (frame pacing).
++            if ((callback(frameInfo) as unknown) === false) return
+ 
+             if (renderer.beginFrame(swapChain, frameInfo.timestamp)) {
+               renderer.render(view)
+@@ -135,6 +141,7 @@ export class FilamentView extends React.PureComponent<FilamentProps> {
+     Logger.debug('Render callback set!')
+ 
+     // Calling this here ensures that only after the latest successful call for attaching a listener, the choreographer is started.
++    if (this.props.paused) return
+     Logger.debug('Starting choreographer')
+     choreographer.start()
+   }
+@@ -160,6 +167,10 @@ export class FilamentView extends React.PureComponent<FilamentProps> {
+     if (prevProps.enableTransparentRendering !== this.props.enableTransparentRendering) {
+       this.updateTransparentRendering(this.props.enableTransparentRendering ?? true)
+     }
++    if (prevProps.paused !== this.props.paused && this.renderCallbackListener != null) {
++      if (this.props.paused) this.pause()
++      else this.resume()
++    }
+     if (prevProps.renderCallback !== this.props.renderCallback && this.swapChain != null) {
+       // Note: if swapChain was null, the renderCallback will be set/updated in onSurfaceCreated, which uses the latest renderCallback prop
+       this.updateRenderCallback(this.props.renderCallback, this.swapChain)
+@@ -321,7 +332,8 @@ export class FilamentView extends React.PureComponent<FilamentProps> {
+ 
+   /** @internal */
+   public render(): React.ReactNode {
+-    return <FilamentNativeView ref={this.ref} onViewReady={this.onViewReady} {...this.props} onTouchStart={this.onTouchStart} />
++    const { paused: _paused, ...props } = this.props
++    return <FilamentNativeView ref={this.ref} onViewReady={this.onViewReady} {...props} onTouchStart={this.onTouchStart} />
+   }
+ }
+ 
+diff --git a/src/react/FilamentViewWithRenderCallbacks.tsx b/src/react/FilamentViewWithRenderCallbacks.tsx
+index 1513393..904cd50 100644
+--- a/src/react/FilamentViewWithRenderCallbacks.tsx
++++ b/src/react/FilamentViewWithRenderCallbacks.tsx
+@@ -7,6 +7,7 @@ import { StyleSheet, ViewStyle } from 'react-native'
+ type ForwardProps = PublicNativeProps & {
+   style?: ViewStyle
+   renderCallback?: RenderCallback
++  paused?: boolean
+ }
+ 
+ /**
+@@ -23,7 +24,8 @@ export function FilamentViewWithRenderCallbacks({
+     (frameInfo) => {
+       'worklet'
+ 
+-      renderCallbackProp?.(frameInfo)
++      // Focus Garden patch: false from the view's own callback skips the frame.
++      if ((renderCallbackProp?.(frameInfo) as unknown) === false) return false
+ 
+       renderCallbacks.value.forEach(({ callback }) => {
+         callback(frameInfo)
+diff --git a/src/types/Choreographer.ts b/src/types/Choreographer.ts
+index 0dbf200..83042fd 100644
+--- a/src/types/Choreographer.ts
++++ b/src/types/Choreographer.ts
+@@ -18,10 +18,13 @@ export type FrameInfo = {
+   timeSinceLastFrame: number
+ }
+ 
+-export type RenderCallback = (frameInfo: FrameInfo) => void
++/** Return false to skip drawing this frame (Focus Garden patch). */
++export type RenderCallback = (frameInfo: FrameInfo) => void | boolean
+ 
+ export interface Choreographer extends PointerHolder {
+   start(): void
+   stop(): void
++  /** Preferred display rate in frames per second; 0 restores the default (Focus Garden patch, iOS only). */
++  setFrameRate?(fps: number): void
+   addFrameCallbackListener(callback: RenderCallback): Listener
+ }
+diff --git a/src/types/TransformManager.ts b/src/types/TransformManager.ts
+index 6608b64..9ec6b24 100644
+--- a/src/types/TransformManager.ts
++++ b/src/types/TransformManager.ts
+@@ -93,6 +93,12 @@ export interface TransformManager extends PointerHolder {
+    */
+   setTransform(entity: Entity, transform: Mat4): void
+ 
++  /**
++   * Sets the local transform of many entities in one call: `matrices` holds 16 column-major
++   * floats per entity, in the same order as `entities`. Runs inside one local transform transaction.
++   */
++  setTransforms(entities: Entity[], matrices: Float32Array): void
++
+   /**
+    * Creates a new identity matrix.
+    */
+diff --git a/src/utilities/withCleanupScope.ts b/src/utilities/withCleanupScope.ts
+index 20ec04e..eb54f74 100644
+--- a/src/utilities/withCleanupScope.ts
++++ b/src/utilities/withCleanupScope.ts
+@@ -1,5 +1,3 @@
+-import { InteractionManager } from 'react-native'
+-
+ /**
+  * Operations that are releasing memory from JS should be executed after cleanup functions
+  * that are still operating on the resource.
+@@ -22,8 +20,9 @@ import { InteractionManager } from 'react-native'
+  */
+ export function withCleanupScope(cleanupFunction: Function) {
+   return () => {
+-    // runAfterInteractions to make sure its called after all children have run their cleanup and all interactions are done
+-    InteractionManager.runAfterInteractions(() => {
++    // After all children have run their cleanup and pending work is done. React Native 0.88 removed
++    // InteractionManager; requestIdleCallback is its documented replacement.
++    requestIdleCallback(() => {
+       // Cleanup in worklets context, as cleanup functions might also use the worklet context
+       // and we want to queue our cleanup after all other worklets have run
+       setTimeout(() => {
+diff --git a/android/CMakeLists.txt b/android/CMakeLists.txt
+--- a/android/CMakeLists.txt
++++ b/android/CMakeLists.txt
+@@ -4,7 +4,8 @@
+ set(PACKAGE_NAME "react-native-filament")
+ set(BUILD_DIR ${CMAKE_SOURCE_DIR}/build)
+ set(CMAKE_VERBOSE_MAKEFILE ON)
+-set(CMAKE_CXX_STANDARD 17)
++# React Native 0.88 bridging headers use C++20 concepts.
++set(CMAKE_CXX_STANDARD 20)
+ 
+ set(FILAMENT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libs/filament")
+ set(BULLET3_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libs/bullet3")

@@ -1,0 +1,21 @@
+# Recorded live with Argent, then converted to semantic targets.
+# NativeTabs' indicator id was ambiguous; all four label + FrameLayout targets
+# were separately verified against the flow runner before replacing raw points.
+executionPrerequisite: >-
+  Android: Focus Garden Next is open on Focus, introduction completed, no wallet
+  linked, no local sessions, and no modal or developer warning covers the tabs.
+  Metro 8183 is running. This fragment does not clear data or create a wallet.
+steps:
+  - await: { visible: { text: Link wallet to plant }, timeout: 20000 }
+  - tap: { text: Stats, role: FrameLayout }
+  - await: { visible: { text: Focused minutes }, timeout: 20000 }
+  - await: { idle: true }
+  - tap: { text: Profile, role: FrameLayout }
+  - await: { visible: { text: Display name }, timeout: 20000 }
+  - await: { idle: true }
+  - tap: { text: Leaders, role: FrameLayout }
+  - await: { visible: { text: The leaderboard lives on Bitcoin Cash. }, timeout: 20000 }
+  - await: { idle: true }
+  - tap: { text: Focus, role: FrameLayout }
+  - await: { visible: { text: Link wallet to plant }, timeout: 20000 }
+  - await: { idle: true }

@@ -1,0 +1,3 @@
+[install]
+# One physical native dependency installation for Expo autolinking.
+linker = "hoisted"

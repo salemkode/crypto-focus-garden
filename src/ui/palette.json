@@ -1,0 +1,21 @@
+{
+  "canvas": "#EEF3F0",
+  "surface": "#FBFCFB",
+  "sunk": "#E3EAE5",
+  "divider": "#D5DED8",
+  "ink": "#15241B",
+  "ink-2": "#4F5E55",
+  "ink-3": "#5C6B62",
+  "moss": "#2A6E27",
+  "moss-soft": "#DCEBD3",
+  "sun": "#F2B53C",
+  "sun-ink": "#8A5A12",
+  "sun-soft": "#FCEFD2",
+  "ember": "#A63A29",
+  "ember-soft": "#F6E1DC",
+  "sky-top": "#CFE8EE",
+  "sky-bottom": "#FFE2C2",
+  "leaf": "#8FD65E",
+  "water": "#4FB0DB",
+  "bch": "#0AC18E"
+}

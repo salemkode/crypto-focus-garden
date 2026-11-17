@@ -1,0 +1,10 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["LibauthNativeModule"],
+    "podspecPath": "LibauthNative.podspec"
+  },
+  "android": {
+    "modules": ["expo.modules.libauthnative.LibauthNativeModule"]
+  }
+}

@@ -1,11 +1,15 @@
 {
-	"extends": "./tsconfig.build.json",
-
-	"compilerOptions": {
-		"target": "es2022",
-		"lib": ["es2022"],
-		"outDir": "./dist-test"
-	},
-
-	"include": ["src/**/*", "test/**/*"]
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": [
+      "es2022"
+    ],
+    "outDir": "./dist-test"
+  },
+  "include": [
+    "src/utils.ts",
+    "artifacts/*.ts",
+    "test/**/*.ts"
+  ]
 }
