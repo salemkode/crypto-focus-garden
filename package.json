@@ -1,21 +1,34 @@
 {
-	"name": "@dapp-starter/root",
+	"name": "@focus-garden/root",
 	"private": true,
 	"version": "0.0.1",
 	"workspaces": [
-		"packages/contracts",
-		"packages/dapp",
 		"packages/*"
 	],
 	"license": "MIT",
 	"scripts": {
 		"compile": "bun run --filter='*' compile",
-		"dev": "bun run --filter='*' dev",
+		"dev": "bun run dev:web",
 		"bump": "node bump_version.cjs",
 		"publish": "bun run --filter='*' publish:public",
 		"build": "bun run --filter='*' compile && cd packages/dapp && bun run build",
-		"test": "bun run --filter='*' test",
-		"clean": "rm -rf packages/**/dist"
+		"test": "bun run test:contracts && bun run test:mobile && bun run test:service",
+		"clean": "rm -rf packages/**/dist",
+		"dev:web": "cd packages/dapp && bun run dev --port 3477",
+		"build:web": "cd packages/dapp && bun run build",
+		"mobile:start": "cd packages/mobile && bun run start",
+		"mobile:ios": "cd packages/mobile && bun run ios",
+		"mobile:android": "cd packages/mobile && bun run android",
+		"mobile:export": "cd packages/mobile && bun run export:check",
+		"typecheck:mobile": "cd packages/mobile && bun run typecheck",
+		"lint:mobile": "cd packages/mobile && bun run lint",
+		"test:mobile": "cd packages/mobile && bun run test",
+		"test:contracts": "cd packages/contracts && bun run test:pomodoro",
+		"test:native-core": "cd packages/mobile/modules/libauth-native && bun run test:host",
+		"check": "bun run typecheck:mobile && bun run typecheck:service && bun run lint:mobile && bun run --cwd packages/mobile check:valley && bun run test",
+		"test:service": "cd packages/service && bun run test",
+		"typecheck:service": "cd packages/service && bun run typecheck",
+		"service:start": "cd packages/service && bun run start"
 	},
 	"dependencies": {
 		"@bch-wc2/interfaces": "^0.0.16",
@@ -26,5 +39,9 @@
 	},
 	"devDependencies": {
 		"@types/node": "^24.10.1"
+	},
+	"patchedDependencies": {
+		"react-native-worklets-core@1.6.3": "patches/react-native-worklets-core@1.6.3.patch",
+		"react-native-filament@1.11.0": "patches/react-native-filament@1.11.0.patch"
 	}
 }
