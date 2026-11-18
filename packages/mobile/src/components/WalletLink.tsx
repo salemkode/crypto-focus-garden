@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import QRCode from 'react-native-qrcode-svg';
@@ -7,6 +7,7 @@ import { useRewards } from '../features/rewards/RewardProvider';
 import { readLinkInfo, useWalletLink } from '../features/wallet-link/useWalletLink';
 import { METHOD_NAME, WALLET_APPS, walletConnectAvailable } from '../features/wallet-link/wallets';
 import { Button, color, continuous, Field, Group, icons, nativeAware, Notice, Row } from '../ui';
+import { RewardNotice } from './PendingOperation';
 
 const short = (address: string) => `${address.slice(0, 14)}…${address.slice(-6)}`;
 
@@ -27,6 +28,9 @@ export const WalletLink = nativeAware(function WalletLink({ onLinked }: { onLink
   const link = useWalletLink(onLinked);
   const [manual, setManual] = useState(false);
   const [draft, setDraft] = useState('');
+  /** Results are shown once this sheet has tried to link, so a message from another screen doesn't appear here. */
+  const [tried, setTried] = useState(false);
+  const [saving, setSaving] = useState(false);
   const linked = rewards.recipient;
   const info = linked ? readLinkInfo(linked) : null;
   const ready = rewards.status === 'ready';
@@ -36,7 +40,9 @@ export const WalletLink = nativeAware(function WalletLink({ onLinked }: { onLink
   const choosing = !linked || changing;
 
   async function saveManual() {
-    if (!await rewards.saveRecipient(draft)) return;
+    setTried(true); setSaving(true);
+    const saved = await rewards.saveRecipient(draft).finally(() => setSaving(false));
+    if (!saved) return;
     setDraft(''); setManual(false);
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onLinked?.();
@@ -51,8 +57,8 @@ export const WalletLink = nativeAware(function WalletLink({ onLinked }: { onLink
         <Row title="Copy link" icon={icons.copy} disabled={!uri} onPress={() => { void Clipboard.setStringAsync(uri); void Haptics.selectionAsync(); }} />
       </Group>
       {uri ? <View className="items-center py-2">
-        <View style={continuous} className="rounded-[20px] bg-white p-4"><QRCode value={uri} size={188} color={color.ink} backgroundColor="#FFFFFF" /></View>
-      </View> : null}
+        <View style={continuous} className="rounded-[20px] bg-white p-4" accessible accessibilityRole="image" accessibilityLabel="Link code. Scan it with a wallet on another phone"><QRCode value={uri} size={188} color={color.ink} backgroundColor="#FFFFFF" /></View>
+      </View> : <View className="items-center py-6"><ActivityIndicator color={color.ink2} accessibilityLabel="Preparing the link" /></View>}
       {link.error ? <Notice tone="error">{link.error}</Notice> : null}
       <Button variant="secondary" label="Cancel" onPress={link.cancel} />
     </>;
@@ -69,9 +75,9 @@ export const WalletLink = nativeAware(function WalletLink({ onLinked }: { onLink
     {choosing ? <>
       <Group title="Choose your wallet" footer="Focus Garden only reads your address.">
         {WALLET_APPS.map((app) => <Row key={app.id} title={app.name} detail={app.id === 'selene' ? 'Recommended' : undefined} image={LOGO[app.id]}
-          disabled={!ready || (app.method === 'walletconnect' && !walletConnectAvailable)} onPress={() => void link.start(app.method, app)} chevron />)}
-        <Row title="WalletConnect" detail="Other wallets" image={LOGO.walletconnect} disabled={!ready || !walletConnectAvailable} onPress={() => void link.start('walletconnect')} chevron />
-        <Row title="WizardConnect" detail="Other wallets" image={LOGO.wizardconnect} disabled={!ready} onPress={() => void link.start('wizardconnect')} chevron />
+          disabled={!ready || (app.method === 'walletconnect' && !walletConnectAvailable)} onPress={() => { setTried(true); void link.start(app.method, app); }} chevron />)}
+        <Row title="WalletConnect" detail="Other wallets" image={LOGO.walletconnect} disabled={!ready || !walletConnectAvailable} onPress={() => { setTried(true); void link.start('walletconnect'); }} chevron />
+        <Row title="WizardConnect" detail="Other wallets" image={LOGO.wizardconnect} disabled={!ready} onPress={() => { setTried(true); void link.start('wizardconnect'); }} chevron />
       </Group>
 
       <Group>
@@ -80,11 +86,11 @@ export const WalletLink = nativeAware(function WalletLink({ onLinked }: { onLink
 
       {manual ? <>
         <Field label="Chipnet address" value={draft} onChangeText={setDraft} autoCorrect={false} autoCapitalize="none" placeholder="bchtest:" />
-        <Button variant="secondary" label="Link this address" disabled={!draft.trim() || !ready} onPress={() => void saveManual()} />
+        <Button variant="secondary" label="Link this address" busy={saving} disabled={!draft.trim() || !ready} onPress={() => void saveManual()} />
       </> : null}
     </> : null}
 
-    {link.error ? <Notice tone="error">{link.error}</Notice> : rewards.notice ? <Notice>{rewards.notice}</Notice> : null}
-    {!ready ? <Text className="px-4 text-footnote text-ink-2">Opening your wallets…</Text> : null}
+    {link.error ? <Notice tone="error">{link.error}</Notice> : tried || rewards.status === 'error' ? <RewardNotice /> : null}
+    {rewards.status === 'opening' ? <Text className="px-4 text-footnote text-ink-2">Opening your wallets…</Text> : null}
   </>;
 });

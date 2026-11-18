@@ -14,8 +14,9 @@ export function MenuPicker<T extends string>({ title, options, value, onChange, 
     <View accessibilityRole="radiogroup" accessibilityLabel={title} className="flex-row flex-wrap gap-2">
       {options.map((option) => {
         const selected = option.id === value;
+        // 36-tall capsules with a hit slop up to 44; picking the current option does nothing (as on iOS).
         return <Pressable key={option.id} accessibilityRole="radio" accessibilityState={{ checked: selected, disabled: Boolean(disabled) }} disabled={disabled}
-          onPress={() => { onChange(option.id); void Haptics.selectionAsync(); }}
+          hitSlop={{ top: 4, bottom: 4 }} onPress={() => { if (!selected) { onChange(option.id); void Haptics.selectionAsync(); } }}
           className={selected ? 'min-h-9 flex-row items-center gap-2 rounded-full bg-moss px-3.5 disabled:opacity-40' : 'min-h-9 flex-row items-center gap-2 rounded-full bg-sunk px-3.5 active:opacity-70 disabled:opacity-40'}>
           {option.color ? <View style={{ backgroundColor: option.color }} className="h-2.5 w-2.5 rounded-full" /> : null}
           <Text className={selected ? 'text-subhead font-semibold text-surface' : 'text-subhead text-ink'}>{option.label}</Text>
@@ -30,8 +31,9 @@ export function StepperRow({ title, value, step, min, max, onChange, disabled }:
   title: string; value: number; step: number; min: number; max: number; onChange: (next: number) => void; disabled?: boolean;
 }) {
   const button = (label: string, icon: typeof icons.plus | typeof icons.minus, next: number, off: boolean) =>
-    <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled || off} onPress={() => { onChange(next); void Haptics.selectionAsync(); }}
-      className="h-9 w-11 items-center justify-center rounded-full bg-sunk active:opacity-60 disabled:opacity-30">
+    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityHint={title} accessibilityState={{ disabled: Boolean(disabled || off) }}
+      disabled={disabled || off} hitSlop={{ top: 4, bottom: 4 }} onPress={() => { onChange(next); void Haptics.selectionAsync(); }}
+      className="h-9 w-11 items-center justify-center rounded-full bg-sunk active:opacity-70 disabled:opacity-40">
       <Icon name={icon} size={15} tint={color.ink} weight="bold" />
     </Pressable>;
   return <View className="min-h-12 flex-row items-center gap-2 px-4 py-2">

@@ -54,11 +54,14 @@ export const MIN_DURATION = 300;
 export const MAX_DURATION = 7200;
 export const DURATION_STEP = 300;
 
-/** Reward sizes, aligned with the Bitcoin Cash lock steps (512 s) so local and verified sessions match. */
+/**
+ * Reward sizes, aligned with the Bitcoin Cash lock steps (512 s) so local and verified sessions match.
+ * Labels use the app's one rounded duration format (`formatDuration`), so the same length reads the same everywhere.
+ */
 export type RewardTier = 'sprout' | 'tree' | 'bigTree' | 'house';
 export const REWARD_PRESETS: readonly { tier: RewardTier; name: string; seconds: number; label: string }[] = [
-  { tier: 'sprout', name: 'Sprout', seconds: 512, label: '8½ min' },
-  { tier: 'tree', name: 'Tree', seconds: 1536, label: '25½ min' },
+  { tier: 'sprout', name: 'Sprout', seconds: 512, label: '9 min' },
+  { tier: 'tree', name: 'Tree', seconds: 1536, label: '26 min' },
   { tier: 'bigTree', name: 'Big Tree', seconds: 3072, label: '51 min' },
   { tier: 'house', name: 'House', seconds: 5632, label: '1 h 34 min' },
 ];

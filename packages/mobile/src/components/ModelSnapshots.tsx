@@ -19,14 +19,20 @@ const TURN_CELL_PIXELS = 600;
 const START_ANGLE = -0.45;
 
 export interface Turntable { uri: string; frames: number; columns: number; rows: number }
-interface Snapshots { icon: (spec: ItemSpec) => Promise<string>; turntable: (spec: ItemSpec) => Promise<Turntable> }
+interface Snapshots {
+  icon: (spec: ItemSpec) => Promise<string>;
+  turntable: (spec: ItemSpec) => Promise<Turntable>;
+  /** Finished renders by spec key, read synchronously so a cached item shows on its first frame. */
+  done: { icon: (key: string) => string | undefined; turntable: (key: string) => Turntable | undefined };
+}
 const SnapshotContext = createContext<Snapshots | null>(null);
 
 type Draw = (renderer: Renderer, gl: ExpoWebGLRenderingContext, spec: ItemSpec) => void;
 
 /** One offscreen GL surface with a serial job queue; renders are cached by spec. */
-function useEngine<T>(draw: Draw, wrap: (uri: string) => T) {
+function useEngine<T>(draw: Draw, wrap: (uri: string) => T, onRequest: () => void) {
   const cache = useRef(new Map<string, Promise<T>>());
+  const done = useRef(new Map<string, T>());
   const queue = useRef<{ spec: ItemSpec; resolve: (value: T) => void; reject: (error: unknown) => void }[]>([]);
   const engine = useRef<((spec: ItemSpec) => Promise<string>) | null>(null);
   const busy = useRef(false);
@@ -47,10 +53,13 @@ function useEngine<T>(draw: Draw, wrap: (uri: string) => T) {
     if (existing) return existing;
     const promise = new Promise<T>((resolve, reject) => { queue.current.push({ spec, resolve, reject }); });
     cache.current.set(key, promise);
-    promise.catch(() => cache.current.delete(key));
+    promise.then((value) => { done.current.set(key, value); }, () => cache.current.delete(key));
+    onRequest();
     void drain();
     return promise;
   }
+
+  const finished = (key: string) => done.current.get(key);
 
   function onContextCreate(gl: ExpoWebGLRenderingContext) {
     try {
@@ -69,7 +78,7 @@ function useEngine<T>(draw: Draw, wrap: (uri: string) => T) {
     } catch (error) { if (__DEV__) console.warn('3D renderer failed', error); engine.current = null; }
   }
 
-  return { request, onContextCreate };
+  return { request, finished, onContextCreate };
 }
 
 /** Renders one item at each angle, one grid cell per angle (a single cell for icons). */
@@ -120,17 +129,21 @@ const asTurntable = (uri: string): Turntable => ({ uri, frames: TURN_FRAMES, col
  * picture is still a real 3D render.
  */
 export function ModelSnapshotHost({ children }: { children: ReactNode }) {
-  const icons = useEngine(drawIcon, asIcon);
-  const turntables = useEngine(drawTurntable, asTurntable);
+  // Each GL surface is created on its first request, not at launch: the turntable surface alone
+  // is a 3600 x 2400 px buffer (about 33 MB) on a 3x screen, and the Focus tab needs neither.
+  const [iconsUsed, setIconsUsed] = useState(false);
+  const [turntablesUsed, setTurntablesUsed] = useState(false);
+  const icons = useEngine(drawIcon, asIcon, () => setIconsUsed(true));
+  const turntables = useEngine(drawTurntable, asTurntable, () => setTurntablesUsed(true));
   // The engines keep their state in refs, so the first render's functions stay valid.
-  const [value] = useState<Snapshots>(() => ({ icon: icons.request, turntable: turntables.request }));
+  const [value] = useState<Snapshots>(() => ({ icon: icons.request, turntable: turntables.request, done: { icon: icons.finished, turntable: turntables.finished } }));
   const cell = TURN_CELL_PIXELS / PixelRatio.get();
   return <SnapshotContext.Provider value={value}>
     {children}
     {/* Invisible renderer. On the web its canvases still take pointer events, so it also sits off screen there. */}
     <View pointerEvents="none" style={{ position: 'absolute', left: Platform.OS === 'web' ? -10000 : 0, top: 0, opacity: 0 }}>
-      <View style={{ width: ICON_POINTS, height: ICON_POINTS * 1.25 }}><GLView style={{ flex: 1 }} onContextCreate={icons.onContextCreate} /></View>
-      <View style={{ width: cell * TURN_COLUMNS, height: cell * TURN_ROWS }}><GLView style={{ flex: 1 }} onContextCreate={turntables.onContextCreate} /></View>
+      {iconsUsed ? <View style={{ width: ICON_POINTS, height: ICON_POINTS * 1.25 }}><GLView style={{ flex: 1 }} onContextCreate={icons.onContextCreate} /></View> : null}
+      {turntablesUsed ? <View style={{ width: cell * TURN_COLUMNS, height: cell * TURN_ROWS }}><GLView style={{ flex: 1 }} onContextCreate={turntables.onContextCreate} /></View> : null}
     </View>
   </SnapshotContext.Provider>;
 }
@@ -139,15 +152,17 @@ function useSnapshot<T>(spec: ItemSpec, kind: 'icon' | 'turntable', enabled: boo
   const snapshots = useContext(SnapshotContext);
   const key = specKey(spec);
   const [result, setResult] = useState<{ key: string; value: T } | null>(null);
+  // Already drawn: show it now, instead of the placeholder for a frame and a second render.
+  const finished = snapshots && enabled ? (snapshots.done[kind](key) as T | undefined) : undefined;
   useEffect(() => {
-    if (!snapshots || !enabled) return;
+    if (!snapshots || !enabled || snapshots.done[kind](key) !== undefined) return;
     let active = true;
     (snapshots[kind](spec) as Promise<T>).then((value) => { if (active) setResult({ key, value }); }).catch(() => undefined);
     return () => { active = false; };
     // key captures every visual input; the object identity changes every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, kind, snapshots, enabled]);
-  return result?.key === key ? result.value : null;
+  return finished ?? (result?.key === key ? result.value : null);
 }
 
 /** The cached 3D icon for an item, or null while it is being drawn. */

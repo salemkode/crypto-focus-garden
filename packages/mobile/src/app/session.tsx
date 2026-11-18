@@ -31,7 +31,12 @@ export default function SessionSheet() {
     ...(__DEV__ ? [{ id: '60', label: '1 min · test build' }] : []),
   ];
   if (!lengths.some((option) => option.id === String(garden.duration))) lengths.push({ id: String(garden.duration), label: lengthLabel(garden.duration) });
-  const blocking = !garden.blockApps ? 'Off' : shield.ready ? `${shield.status!.selectionCount} apps` : 'Set up';
+  const count = shield.status?.selectionCount ?? 0;
+  // "Set up" only once the blocking status is known, so it never flashes before the app count.
+  const blocking = !garden.blockApps ? 'Off' : shield.ready ? `${count} ${count === 1 ? 'app' : 'apps'}` : shield.status ? 'Set up' : 'On';
+  // While the wallet session opens, say so; if its last read failed, offer a read-only retry (never a transaction).
+  // "Busy" alone is any transaction or refresh; it means connecting only while the garden has not loaded yet (as on Leaders).
+  const reconnecting = rewards.status === 'opening' || (rewards.status === 'busy' && Boolean(rewards.account) && rewards.data.state !== 'connected');
 
   return <Screen>
     <Group footer="For longer focus, plant again and merge.">
@@ -40,7 +45,7 @@ export default function SessionSheet() {
     </Group>
 
     <Group title="Tree">
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-3 p-3">{SPECIES.map((entry) => {
+      <ScrollView horizontal accessibilityRole="radiogroup" accessibilityLabel="Tree" showsHorizontalScrollIndicator={false} contentContainerClassName="gap-3 p-3">{SPECIES.map((entry) => {
         const chosen = garden.species === entry.id;
         return <Pressable key={entry.id} accessibilityRole="radio" accessibilityLabel={entry.name} accessibilityState={{ checked: chosen, disabled: locked }} disabled={locked}
           onPress={() => pick({ species: entry.id })} className="w-[84px] items-center gap-1.5 active:opacity-70 disabled:opacity-40">
@@ -54,9 +59,11 @@ export default function SessionSheet() {
     </Group>
 
     <Group footer={canVerify ? 'Locked on Bitcoin Cash and sent to your wallet when it grows.' : undefined}>
-      {canVerify ? <SwitchRow title="Verify on Bitcoin Cash" icon={icons.lock} iconTint={color.bch} value={garden.verify} disabled={locked} onValueChange={(next) => pick({ verify: next })} />
+      {canVerify ? <SwitchRow title="Verify on Bitcoin Cash" icon={icons.lock} iconTint={color.bch} value={garden.verify} disabled={locked} onValueChange={(next) => configure({ verify: next })} />
         : !linked ? <Row title="Link your wallet to verify" icon={icons.lock} iconTint={color.bch} onPress={() => router.push('/link-wallet')} chevron />
-        : !rewards.account ? <Row title="Set up Focus Garden wallet to verify" icon={icons.lock} iconTint={color.bch} onPress={() => router.navigate('/profile')} chevron />
+        : !rewards.account ? <Row title="Set up your Focus Garden wallet to verify" icon={icons.lock} iconTint={color.bch} onPress={() => router.navigate('/profile')} chevron />
+        : reconnecting ? <Row title="Verify on Bitcoin Cash" detail="Connecting…" icon={icons.lock} iconTint={color.bch} />
+        : rewards.freshness === 'stale' ? <Row title="Verify on Bitcoin Cash" detail="Couldn't connect. Tap to try again." icon={icons.lock} iconTint={color.bch} onPress={() => void rewards.refresh()} />
         : <Row title="Verify on Bitcoin Cash" detail="Not available right now" icon={icons.lock} iconTint={color.bch} />}
       <Row title="Block apps" icon={icons.shield} iconTint={color.ember} value={blocking} onPress={() => router.push('/settings')} chevron />
     </Group>

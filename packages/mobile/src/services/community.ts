@@ -26,11 +26,6 @@ export async function fetchProfile(wallet: string) {
   ]).parse(await rpc({ method: 'profile', wallet }));
 }
 
-/** 1 focus unit = 512 verified seconds. */
-export function focusHours(points: number) {
-  const hours = (points * 512) / 3600;
-  return hours >= 10 ? `${Math.round(hours)} h` : `${hours.toFixed(1)} h`;
-}
 
 // The member the user tapped, handed to the member sheet without putting data in the URL.
 let selected: LeaderEntry | null = null;

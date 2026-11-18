@@ -26,7 +26,7 @@ export function Screen({ children, title, accessory, contentClassName = '', onRe
       refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={color.moss} /> : undefined}
       contentContainerClassName={`gap-7 px-4 pb-16 pt-2 ${contentClassName}`}>
       {title ? <View className="-mb-2 min-h-11 flex-row items-center justify-between gap-3 px-1">
-        <Text accessibilityRole="header" className="text-large-title text-ink">{title}</Text>
+        <Text accessibilityRole="header" className="shrink text-large-title text-ink">{title}</Text>
         {accessory}
       </View> : null}
       {children}

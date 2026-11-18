@@ -4,11 +4,13 @@ import { Pressable, Text, View } from 'react-native';
 import { PeriodPicker } from '../../../components/PeriodPicker';
 import { TreeSprite } from '../../../components/TreeSprite';
 import { speciesById, tagById } from '../../../features/focus/catalog';
-import { useFocusGarden } from '../../../features/focus/FocusProvider';
-import { continuous, Group, icons, numerals, Row, Screen, Stats } from '../../../ui';
+import { useFocusGarden, useNow } from '../../../features/focus/FocusProvider';
+import { continuous, EmptyState, Group, icons, numerals, Screen, Stats } from '../../../ui';
 import { currentStreak, focusBuckets, formatDuration, periodLabel, periodRange, recordsIn, summarize, tagTotals, type Period } from '../../../features/focus/stats';
 
 const CHART_HEIGHT = 140;
+/** Longest session list drawn at once; the footer says when older sessions are left out. */
+const SESSION_ROWS = 30;
 
 /** "this week", "today", or the past period's own name ("on Mon 3 Nov", "in Oct 2026"). */
 function periodPhrase(period: Period, anchor: number, now: number) {
@@ -26,7 +28,8 @@ function sessionTime(period: Period, at: number) {
 }
 
 export default function StatsScreen() {
-  const { garden, now } = useFocusGarden();
+  const { garden } = useFocusGarden();
+  const now = useNow();
   const [period, setPeriod] = useState<Period>('week');
   const [anchor, setAnchor] = useState(now);
   const records = recordsIn(garden.records, periodRange(period, anchor));
@@ -51,25 +54,25 @@ export default function StatsScreen() {
       {facts.length ? <Stats items={facts} /> : null}
     </View>
 
-    {empty ? <Group>
-      <Row icon={icons.tree} title={`Nothing planted ${periodPhrase(period, anchor, now)}`} value="Plant a tree" onPress={() => router.navigate('/')} chevron />
-    </Group> : null}
+    {empty ? <EmptyState icon={icons.tree} title="Plant a tree" detail={`Nothing planted ${periodPhrase(period, anchor, now)}`} onPress={() => router.navigate('/')} /> : null}
 
     {summary.focusedSeconds > 0 ? <FocusChart key={`${period}-${periodRange(period, anchor).start}`} period={period} anchor={anchor} records={garden.records} /> : null}
 
     {tags.length ? <Group title="By tag">
-      {tags.map((entry) => <View key={entry.id} className="gap-2 px-4 py-3">
+      {tags.map((entry) => <View key={entry.id} accessible accessibilityLabel={`${entry.label}, ${formatDuration(entry.seconds)}, ${Math.round((entry.seconds / summary.focusedSeconds) * 100)}%`} className="gap-2 px-4 py-3">
         <View className="flex-row justify-between"><Text className="text-body text-ink">{entry.label}</Text><Text style={numerals} className="text-subhead text-ink-2">{formatDuration(entry.seconds)} · {Math.round((entry.seconds / summary.focusedSeconds) * 100)}%</Text></View>
         <View style={{ width: `${Math.max(2, (entry.seconds / tagMax) * 100)}%`, backgroundColor: entry.color }} className="h-2 rounded-full" />
       </View>)}
     </Group> : null}
 
-    {!empty ? <Group title="Sessions">
-      {[...records].reverse().slice(0, 30).map((entry) => <View key={entry.id} className="min-h-14 flex-row items-center gap-3 px-4 py-2">
+    {!empty ? <Group title="Sessions" footer={records.length > SESSION_ROWS ? `Latest ${SESSION_ROWS} of ${records.length} sessions.` : undefined}>
+      {[...records].reverse().slice(0, SESSION_ROWS).map((entry) => <View key={entry.id} accessible
+        accessibilityLabel={`${tagById(entry.tag).label}, ${speciesById(entry.species).name}, ${sessionTime(period, entry.startedAt)}, ${entry.outcome === 'grown' ? formatDuration(entry.duration) : 'withered'}`}
+        className="min-h-14 flex-row items-center gap-3 px-4 py-2">
         <TreeSprite species={entry.species} withered={entry.outcome === 'withered'} size={28} />
         <View className="flex-1">
-          <Text className="text-body text-ink">{tagById(entry.tag).label}</Text>
-          <Text className="text-footnote text-ink-2">{speciesById(entry.species).name} · {sessionTime(period, entry.startedAt)}</Text>
+          <Text numberOfLines={1} className="text-body text-ink">{tagById(entry.tag).label}</Text>
+          <Text numberOfLines={1} className="text-footnote text-ink-2">{speciesById(entry.species).name} · {sessionTime(period, entry.startedAt)}</Text>
         </View>
         <Text style={numerals} className={entry.outcome === 'grown' ? 'text-subhead text-ink' : 'text-subhead text-ember'}>{entry.outcome === 'grown' ? formatDuration(entry.duration) : 'Withered'}</Text>
       </View>)}

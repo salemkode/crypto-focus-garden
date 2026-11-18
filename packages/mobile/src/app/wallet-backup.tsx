@@ -51,7 +51,7 @@ export default function WalletBackupScreen() {
   return <Screen>
     <Notice tone="warning">{`Anyone with this ${what} can use your Focus Garden wallet. Keep it private; Focus Garden will never ask for it.`}</Notice>
     {state === 'visible' ? <View className="gap-3">
-      <View style={continuous} className="rounded-[20px] bg-surface p-4" accessible accessibilityLabel="Sensitive wallet backup">
+      <View style={continuous} className="rounded-[20px] bg-surface p-4" accessible accessibilityLabel={`Your ${what} is on screen. It is not read aloud, to keep it private.`}>
         {words.length ? <View className="flex-row flex-wrap">
           {words.map((word, index) => <View key={index} className="w-1/2 flex-row items-baseline gap-2 py-1.5 pr-2">
             <Text selectable={false} style={numerals} className="w-6 text-right text-footnote text-ink-3">{index + 1}</Text>
@@ -59,7 +59,7 @@ export default function WalletBackupScreen() {
           </View>)}
         </View> : <Text selectable={false} style={numerals} className="text-title-3 font-medium leading-8 text-ink">{secret}</Text>}
       </View>
-      <Text className="px-4 text-footnote text-ink-2">Hides after one minute or when you leave the app. Do not take a photo of it.</Text>
+      <Text className="px-4 text-footnote text-ink-2">{`Write it down on paper${words.length ? ', in order,' : ''} and keep it offline. It hides after one minute or when you leave the app.`}</Text>
       <Button variant="secondary" label={`Hide ${what}`} onPress={() => { setSecret(''); setState('hidden'); }} />
     </View> : <Button label={`Show ${what}`} icon={icons.lock} busy={state === 'unlocking'} disabled={!rewards.account} onPress={reveal} />}
     {notice ? <Notice tone="error">{notice}</Notice> : null}

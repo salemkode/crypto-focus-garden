@@ -32,8 +32,9 @@ function NativeField({ label, helper, error, multiline, value, onChangeText, pla
     ...(editable === false ? [disabledModifier()] : []),
     ...(onSubmitEditing ? [onSubmit(() => onSubmitEditing({} as never))] : []),
   ];
-  const footer = error ? <Text modifiers={[foregroundStyle(color.ember)]}>{error}</Text> : helper ? <Text>{helper}</Text> : undefined;
-  return <Section title={label} footer={footer}>
+  // Label and helper in ink-2, error in ember: the same colours (and contrast) as Group and Android.
+  const footer = error ? <Text modifiers={[foregroundStyle(color.ember)]}>{error}</Text> : helper ? <Text modifiers={[foregroundStyle(color.ink2)]}>{helper}</Text> : undefined;
+  return <Section header={<Text modifiers={[foregroundStyle(color.ink2)]}>{label}</Text>} footer={footer}>
     {secureTextEntry
       ? <SecureField ref={ref} text={text} placeholder={placeholder} maxLength={maxLength} onTextChange={changed} modifiers={modifiers} />
       : <TextField ref={ref} text={text} placeholder={placeholder} maxLength={maxLength} onTextChange={changed} axis={multiline ? 'vertical' : 'horizontal'} modifiers={modifiers} />}

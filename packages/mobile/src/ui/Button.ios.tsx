@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react';
-import { Button as SwiftButton, Host, Label, ProgressView, Text } from '@expo/ui/swift-ui';
-import { accessibilityHint as a11yHint, accessibilityLabel as a11yLabel, buttonBorderShape, buttonStyle, controlSize, disabled as disabledModifier, foregroundStyle, frame, labelStyle, tint } from '@expo/ui/swift-ui/modifiers';
+import { Button as SwiftButton, Host, HStack, Label, ProgressView, Text } from '@expo/ui/swift-ui';
+import { accessibilityHint as a11yHint, accessibilityLabel as a11yLabel, accessibilityValue as a11yValue, buttonBorderShape, buttonStyle, controlSize, disabled as disabledModifier, foregroundStyle, frame, labelStyle, tint } from '@expo/ui/swift-ui/modifiers';
 import { Button as RNButton, IconButton as RNIconButton } from './Button.rn';
 import { BareSection, markNative, useNativeScope } from './native/scope';
 import { color } from './tokens';
@@ -23,7 +23,8 @@ export const Button = markNative(function Button({ label, onPress, variant = 'pr
   const ink = disabled || busy ? undefined : INK[variant];
   const fillFrame = fill ? [frame({ maxWidth: Infinity })] : [];
   const labelModifiers = [...fillFrame, ...(ink ? [foregroundStyle(ink)] : [])];
-  const body = busy ? <ProgressView modifiers={fillFrame} />
+  // Busy keeps the label next to a spinner (as on Android), so the button keeps its meaning.
+  const body = busy ? <HStack spacing={8} modifiers={fillFrame}><ProgressView /><Text>{label}</Text></HStack>
     : icon ? <Label title={label} systemImage={icon.ios as never} modifiers={labelModifiers} />
     : <Text modifiers={labelModifiers}>{label}</Text>;
   const button = <SwiftButton onPress={onPress} role={variant === 'destructive' ? 'destructive' : undefined} modifiers={[
@@ -33,6 +34,7 @@ export const Button = markNative(function Button({ label, onPress, variant = 'pr
     ...(disabled || busy ? [disabledModifier()] : []),
     a11yLabel(accessibilityLabel ?? label),
     ...(accessibilityHint ? [a11yHint(accessibilityHint)] : []),
+    ...(busy ? [a11yValue('In progress')] : []),
   ]}>{body}</SwiftButton>;
   if (scope === 'form') return <BareSection>{button}</BareSection>;
   if (scope === 'section') return button;

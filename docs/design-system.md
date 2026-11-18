@@ -116,6 +116,8 @@ happens ("Plant", "Restore wallet", "Send tip"), and the result uses the same wo
 | `Icon` | SF Symbol on iOS, Material Symbol on Android and web |
 | `Floating` | The only elevated surface: panels and buttons floating over the valley |
 | `Screen` | Scrolling page. Tab roots pass `title`: a large title in the top bar row, with no empty bar row above it; scrolled content never meets the status bar |
+| `EmptyState` | The collapsed empty state: one row in its own group that names the next step and goes there |
+| `Footnote` | A standalone footnote in the group footer style, for text that cannot be a group's footer |
 
 ## Anti-slop rules (second pass, 16 November 2026)
 
@@ -175,6 +177,98 @@ Shared changes in `src/ui` and the root layout:
   ember for destructive instead of the system red). Disabled buttons keep the system dimming.
 - `Notice` on iOS: tone on the symbol, body text in ink (ember for errors), as on Android.
 - `Chip` and the Android `MenuPicker`: selected state is moss, matching the color rules.
+
+## Fourth pass (18 November 2026)
+
+Accessibility, platform parity and one visual language across `src/ui`, plus the screen changes
+that adopt it: `EmptyState` is in use on Leaders, Stats and the member sheet, `Footnote` on Leaders.
+
+### Accessibility rules
+
+- Every interactive component exposes a role, a label and its state: `Button` (button; disabled,
+  busy), `IconButton` (button; disabled), `Row` (button; disabled), `SwitchRow` (switch; checked,
+  disabled), `ChoiceRow`, `Chip` and `MenuPicker` options (radio; checked, disabled), `Segmented`
+  (tab; selected, disabled), `StepperRow` buttons (button; disabled, with the row title as hint),
+  `Field` (label; on Android and web the helper or error is also the hint; `Field.ios` sets no
+  hint).
+- `SwitchRow` on Android and web is one switch element: the whole row toggles on tap (Material
+  list convention) and the switch only shows the state. A static `Row` reads as one element unless
+  its `accessory` is a control of its own.
+- iOS rows: leading symbols, logos, trailing symbols and chevrons are hidden from VoiceOver (the
+  title or the row label says it all); a static row is one combined element; a selected
+  `ChoiceRow` carries the Selected trait instead of an unnamed checkmark.
+- `Notice` is one element; warnings and errors are alerts and are announced when they appear
+  (live region on Android). A `Field` error is announced the same way.
+- Touch targets: at least 44 points. Controls drawn smaller keep their look and get a hit slop:
+  small `Button`, `Chip`, `MenuPicker` capsules, `Segmented` segments and `StepperRow` buttons are
+  36 tall with 4 points above and below.
+- Dynamic Type: text is never clipped. Button labels wrap instead of truncating; heights are
+  minimums, never fixed, around text; font scaling is never disabled and no component caps it.
+  One-line truncation is kept only where layout cannot grow (a row's trailing value, segment and
+  chip labels).
+- Reduce Motion: no `src/ui` component animates. Screen-level Reanimated layout animations
+  (`entering`) follow the system setting by default (`ReduceMotion.System`).
+
+### Contrast (WCAG 2.2 AA, computed from `palette.json`)
+
+All text pairs in use pass 4.5:1. iOS rows sit on white (`secondarySystemGroupedBackground`) over
+#F2F2F7 (`systemGroupedBackground`).
+
+| Text | On | Ratio |
+|---|---|---|
+| `ink` | canvas / surface / sunk / sun / iOS grouped | 14.4 / 15.7 / 13.2 / 8.8 / 14.5 |
+| `ink-2` | canvas / surface / sunk / sun-soft / moss-soft / white / iOS grouped | 6.1 / 6.7 / 5.6 / 6.0 / 5.5 / 6.9 / 6.1 |
+| `ink-3` | surface / sunk / white | 5.5 / 4.6 / 5.6 |
+| `surface` (white label) | moss | 6.1 (white 6.3) |
+| `moss` | surface / canvas / sunk / moss-soft / white / iOS grouped | 6.1 / 5.6 / 5.1 / 5.0 / 6.3 / 5.6 |
+| `sun-ink` | surface / canvas / sun-soft / white | 5.8 / 5.3 / 5.2 / 5.9 |
+| `ember` | canvas / surface / ember-soft / sunk / white / iOS grouped | 5.7 / 6.3 / 5.1 / 5.3 / 6.4 / 5.8 |
+
+Fixed: iOS section headers, section footers and `Field` labels and helpers used the system
+secondary label (3.3:1 on the grouped background, 3.4:1 on white; below AA at 13 to 17 points). They now
+use `ink-2` (6.1:1), the same color as on Android and as the footnotes screens host in the form.
+
+Non-text, left as is (decorative, the row title carries the meaning): the white symbol on a `bch`
+icon tile is 2.3:1. The off track of the Android switch (`divider` on `surface`, 1.3:1) relies on
+the thumb's position and shadow.
+
+### Platform parity (Android and web)
+
+- Rows share one frame: at least 48 tall, 16 gutter, 12 between items. Pressed: Material ripple
+  on Android (ink at 12%, clipped by the group's corners), the `sunk` highlight on web.
+- Capsules press to 70% opacity; everything disabled is 40% opacity (was 30 on icon and stepper
+  buttons). A disabled `Segmented` dims its track; a read-only `Field` dims its input.
+- Group header style: `text-subhead font-semibold text-ink-2` (was footnote), closer to the iOS 26
+  section header. `Field` labels use the same style and the same 16 inset as group headers;
+  helpers and errors use the group footer inset.
+
+### One visual language
+
+- Footnote: `text-footnote text-ink-2` with a 16 inset (`Footnote`, or a group's `footer`).
+- Group header: `text-subhead font-semibold text-ink-2`, sentence case.
+- Values: `ink-2`, one line, on the right. Chevrons: `ink-3`, only on rows that navigate.
+- Destructive: `ember` text (rows and buttons), never the system red.
+- Busy `Button`: a spinner in place of the icon, the label kept, the button disabled (VoiceOver
+  adds "In progress"). The button keeps its meaning and width while it works.
+- Empty state: `EmptyState` (title = what to do, detail = why it is empty, chevron when it
+  navigates; `chevron={false}` for an action done in place). It replaces the hand-built
+  `<Group><Row … chevron /></Group>` on Leaders, Stats and the member sheet.
+
+### Sheets (reviewed, unchanged)
+
+| Screen | Presentation | Why |
+|---|---|---|
+| Next session | form sheet 0.75 / full, grabber | Two pickers, the tree strip and two rows fit at 0.75 |
+| Member card | form sheet 0.6 / full, grabber, no header | Name, facts, tip amount and the button fit at 0.6 |
+| Your wallet | form sheet 0.6 / full, grabber | Wallet list fits at 0.6; manual entry and QR grow to full |
+| Focus rules | page sheet | Pushes Blocked apps; a page sheet holds the pushed screen |
+| Tree styles | page sheet | Tall grid, closes on pick |
+| On Bitcoin Cash | page sheet | Reading content longer than half the screen |
+| Back up wallet | page sheet | Shows the secret full height, away from the content behind it |
+| Restore wallet | page sheet | Text entry: a fixed full height keeps the field above the keyboard |
+
+Resizable sheets show the grabber; page sheets do not (iOS 26 convention). The welcome flow stays a
+full-screen modal without a swipe to dismiss.
 
 ## Motion
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform, Pressable, Text, View } from 'react-native';
 import { useIsFocused } from 'expo-router';
 import Animated, { FadeInDown, FadeOutDown, useSharedValue } from 'react-native-reanimated';
@@ -17,8 +17,10 @@ import { color, Floating, Icon, icons, numerals } from '../../ui';
  * The whole valley as one screen. The 3D world runs in the valley host (a WebView on phones, the
  * page itself on the web); the floating card, the Merge button, the planner and the reveal are
  * React Native, driven by messages from the world.
+ * Memoised: the Focus screen re-renders with its one-second clock, while the valley's props only
+ * change with the garden's history, the growing tree's visible steps and the layout.
  */
-export function ValleyView({ seed, history, growing, bottomInset, topInset, merging, plantedAt, onMerge, onPlanning }: {
+export const ValleyView = memo(function ValleyView({ seed, history, growing, bottomInset, topInset, merging, plantedAt, onMerge, onPlanning }: {
   seed: number;
   history: ValleyEvent[];
   growing: { entity: ValleyEntity; progress: number } | null;
@@ -124,7 +126,7 @@ export function ValleyView({ seed, history, growing, bottomInset, topInset, merg
     <MergePlanner visible={planner} options={options} plan={plan} onConfirm={confirm} onClose={() => setPlanner(false)} />
     <RevealCard reveal={reveal} onDone={() => setReveal(null)} />
   </View>;
-}
+});
 
 /** The sky behind the (transparent) world: a soft afternoon gradient, drawn by React Native. */
 function SkyBackdrop() {

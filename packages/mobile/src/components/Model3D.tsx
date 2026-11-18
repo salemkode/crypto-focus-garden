@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, PanResponder, Platform, View, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useFrameCallback, useSharedValue, withSpring, type SharedValue } from 'react-native-reanimated';
 import { GLView, type ExpoWebGLRenderingContext } from 'expo-gl';
+import { useIsFocused } from 'expo-router';
 import { Renderer } from 'expo-three';
 import * as THREE from 'three';
 import { buildItem, createStage, frame, framingGeometry, specKey, type ItemSpec } from '../features/three/scene';
@@ -36,7 +37,11 @@ export function Model3D(props: Props) {
 const SWIPE_POINTS = 40;
 
 function TurntableModel({ spec, size, style, spin = true, onPress, onSwipe }: Props) {
-  const sheet = useTurntable(spec);
+  // Tabs and covered screens stay mounted. Out of sight, the model neither renders its turntable
+  // (24 views into a 3600 x 2400 px sheet, which a hidden tab used to do at launch) nor wakes the UI
+  // thread every display frame to turn it. The still image shows until the sheet is ready.
+  const visible = useIsFocused();
+  const sheet = useTurntable(spec, visible);
   const still = useItemImage(spec);
   const angle = useSharedValue(0);
   const velocity = useSharedValue(0);
@@ -44,13 +49,14 @@ function TurntableModel({ spec, size, style, spin = true, onPress, onSwipe }: Pr
   const spinning = useSharedValue(spin);
   useEffect(() => { spinning.set(spin); }, [spin, spinning]);
 
-  useFrameCallback(({ timeSincePreviousFrame }) => {
+  const turning = useFrameCallback(({ timeSincePreviousFrame }) => {
     'worklet';
     if (held.value) return;
     const seconds = (timeSincePreviousFrame ?? 16) / 1000;
     angle.value += velocity.value * seconds + (spinning.value ? SPIN_FPS * seconds : 0);
     velocity.value *= Math.pow(0.04, seconds);
-  });
+  }, visible);
+  useEffect(() => { turning.setActive(visible); }, [turning, visible]);
 
   const start = useSharedValue(0);
   const offset = useSharedValue(0);

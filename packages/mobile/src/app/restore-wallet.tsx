@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { AppState, Text } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { restoreNativeWallet } from '../features/wallet/wallet';
 import { recoveryPhraseSchema } from '../features/wallet/mnemonic';
 import * as SecureStore from 'expo-secure-store';
@@ -25,7 +26,7 @@ export default function RestoreWalletScreen() {
     return () => subscription.remove();
   }, []);
   async function restore() {
-    if (savedOperation()) { setNotice('Finish the saved operation before restoring or changing app-wallet identity.'); return; }
+    if (savedOperation()) { setNotice('Finish the unfinished transaction in Profile first. Restoring waits until nothing is in progress.'); return; }
     const validated = (kind === 'xo' ? recoveryPhraseSchema : rawKeySchema).safeParse(phrase);
     if (!validated.success) { setNotice(validated.error.issues[0]?.message ?? 'Check the words and their order.'); return; }
     setStatus('saving'); setNotice('');
@@ -35,6 +36,7 @@ export default function RestoreWalletScreen() {
       Storage.setItemSync('focusgarden.active.wallet.v1', kind);
       await rewards.open();
       setPhrase('');
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace('/profile');
     } catch (cause) {
       setNotice(cause instanceof Error ? cause.message : 'Could not save the recovery phrase. Unlock your device and retry.');

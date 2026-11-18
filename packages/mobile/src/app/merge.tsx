@@ -3,7 +3,7 @@ import { Alert, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { FOREST_TIERS, parseTree } from '@focus-garden/protocol/forest';
 import { ItemView } from '../components/ItemView';
-import { PendingOperation } from '../components/PendingOperation';
+import { PendingOperation, RewardNotice } from '../components/PendingOperation';
 import { nftTree } from '../features/forest/nft-style';
 import { sampleRewardSessions, useSampleForest } from '../features/forest/samples';
 import { useRewards } from '../features/rewards/RewardProvider';
@@ -20,6 +20,8 @@ export default function MergeScreen() {
   const matured = mergeableTrees(sessions).sort((a, b) => a.plantedAt - b.plantedAt);
   const enabled = samples === null && rewards.status === 'ready' && Boolean(rewards.account) && !rewards.pending && rewards.freshness === 'current';
   const [refreshing, setRefreshing] = useState(false);
+  /** The recipe whose merge this screen started, for its loading state. */
+  const [merging, setMerging] = useState<number | null>(null);
   function refresh() {
     if (samples !== null || rewards.status !== 'ready' || !rewards.account) return;
     setRefreshing(true);
@@ -28,11 +30,15 @@ export default function MergeScreen() {
   // Recipes that can merge now. Only the first gets the primary button; any others are secondary.
   const possible = samples === null ? STEPS.filter(({ from }) => matured.filter((session) => parseTree(session.commitment)?.tier === from.code).length >= from.mergeCount!).map(({ from }) => from.code) : [];
 
-  function confirm(ingredients: string[], result: string, source: string) {
+  function confirm(code: number, ingredients: string[], result: string, source: string) {
     void Haptics.selectionAsync();
-    Alert.alert(`Merge into a ${result.toLowerCase()}?`, `${ingredients.length} ${source.toLowerCase()}s become one ${result.toLowerCase()}. Your verified focus score stays the same. This can't be undone.`, [
+    Alert.alert(`Merge into a ${result.toLowerCase()}?`, `${ingredients.length} ${source.toLowerCase()}s become one ${result.toLowerCase()}, which shows up in Verified trees. Your verified focus score stays the same. This can't be undone.\n\nCost: a 2,000-sat network fee, in test coins with no cash value.`, [
       { text: 'Not now', style: 'cancel' },
-      { text: 'Merge', onPress: () => { void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); void rewards.transact({ action: 'merge', commitments: ingredients }); } },
+      { text: 'Merge', onPress: () => {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setMerging(code);
+        void rewards.transact({ action: 'merge', commitments: ingredients }).finally(() => setMerging(null));
+      } },
     ]);
   }
 
@@ -64,9 +70,9 @@ export default function MergeScreen() {
             <Text style={numerals} className="text-footnote text-ink-2">{progress}</Text>
           </View>
         </View>
-        {enough && samples === null ? <Button variant={possible[0] === from.code ? 'primary' : 'secondary'} label={`Merge into a ${to.name.toLowerCase()}`} disabled={!enabled} onPress={() => confirm(ingredients, to.name, from.name)} /> : null}
+        {enough && samples === null ? <Button variant={possible[0] === from.code ? 'primary' : 'secondary'} label={`Merge into a ${to.name.toLowerCase()}`} busy={merging === from.code} disabled={!enabled} onPress={() => confirm(from.code, ingredients, to.name, from.name)} /> : null}
       </View>;
     })}
-    {rewards.notice && samples === null ? <Notice tone="error">{rewards.notice}</Notice> : null}
+    {samples === null ? <RewardNotice /> : null}
   </Screen>;
 }

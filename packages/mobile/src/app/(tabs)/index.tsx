@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { router } from 'expo-router';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { AccessibilityInfo, Alert, Pressable, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { seedOf } from '@focus-garden/garden/valley';
 import { ValleyView } from '../../components/valley/ValleyView';
 import { levelForSeconds, levelName, MAX_SESSION, SPECIES_CODE, speciesById, tagById, tierForSeconds } from '../../features/focus/catalog';
-import { useFocusGarden } from '../../features/focus/FocusProvider';
+import { useFocusGarden, useNow } from '../../features/focus/FocusProvider';
 import { onchainSessionView } from '../../features/focus/onchain-session';
 import { growthProgress, remainingSeconds } from '../../features/focus/session';
 import { formatClock, formatDuration } from '../../features/focus/stats';
@@ -19,7 +19,8 @@ import { Arc, Button, color, Floating, Icon, IconButton, icons, Notice, numerals
 
 /** The valley is the screen. Plant, and your tree grows in its own plot while you focus. */
 export default function FocusScreen() {
-  const { garden, storage, now, plant, giveUp, dismiss, configure } = useFocusGarden();
+  const { garden, storage, plant, giveUp, dismiss, configure } = useFocusGarden();
+  const now = useNow();
   const shield = useShield();
   const rewards = useRewards();
   const timer = garden.timer;
@@ -31,6 +32,7 @@ export default function FocusScreen() {
   const blocking = garden.blockApps && shield.ready;
   const length = idle ? garden.duration : timer.duration;
   const reward = { name: levelName(levelForSeconds(length)) };
+  const size = reward.name.toLowerCase();
   const linked = Boolean(rewards.recipient);
   const canVerify = Boolean(rewards.account && linked && rewards.data.state === 'connected');
   const verified = garden.verify && canVerify;
@@ -63,14 +65,29 @@ export default function FocusScreen() {
   }, [storage, idle, garden.duration, configure]);
 
   // Feel every moment: a firm tap to plant, a cheer when it grows, a nudge when it withers.
-  const previous = useRef(timer.status);
+  // VoiceOver and TalkBack hear the same three moments, and nothing in between.
+  // Only real transitions count: loading a saved garden on launch is not one.
+  const previous = useRef<typeof timer.status | null>(null);
   useEffect(() => {
-    if (previous.current === timer.status) return;
-    if (timer.status === 'growing') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    if (timer.status === 'grown') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    if (timer.status === 'withered') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    if (storage !== 'ready') return;
+    const before = previous.current;
     previous.current = timer.status;
-  }, [timer.status]);
+    if (before === null || before === timer.status) return;
+    if (timer.status === 'growing') {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      AccessibilityInfo.announceForAccessibility(`Planted. Growing a ${size} for ${formatDuration(length)}.`);
+    }
+    if (timer.status === 'grown') {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      AccessibilityInfo.announceForAccessibility(`Your ${size} joined your valley.`);
+    }
+    if (timer.status === 'withered') {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      AccessibilityInfo.announceForAccessibility(`Your ${size} withered.`);
+    }
+    // Fires on status changes only; the name and length belong to that same timer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timer.status, storage]);
 
   function start() {
     // Every tree belongs to a wallet: there is no planting before one is linked.
@@ -92,8 +109,10 @@ export default function FocusScreen() {
     ]);
   }
 
-  const blockedLine = blocking ? `${shield.status!.selectionCount} apps blocked` : null;
-  const stateParts = [`Grows a ${reward.name.toLowerCase()}`, species.name, blockedLine].filter(Boolean);
+  const blockedCount = blocking ? shield.status!.selectionCount : 0;
+  const blockedLine = blocking ? `${blockedCount} ${blockedCount === 1 ? 'app' : 'apps'} blocked` : null;
+  const left = remainingSeconds(timer, now) ?? 0;
+  const stateParts = [`Grows a ${size}`, species.name, blockedLine].filter(Boolean);
   const stateLine = stateParts.join(' · ');
 
   return <View className="flex-1 bg-canvas">
@@ -104,25 +123,27 @@ export default function FocusScreen() {
 
     <SafeAreaView edges={['top']} pointerEvents="box-none" className="absolute left-0 right-0 top-0">
       <View pointerEvents="box-none" className="flex-row items-center gap-2 px-4 pt-1">
-        <View>
+        {/* Hidden while a tree grows, like Focus rules: linking opens another wallet app, and leaving withers the tree. */}
+        {growing ? null : <View>
           <IconButton floating icon={icons.wallet} label={linked ? 'Your wallet, linked' : 'Link your wallet'} onPress={() => router.push('/link-wallet')} />
           {linked ? null : <View pointerEvents="none" className="absolute right-1 top-1 h-3 w-3 rounded-full border-2 border-surface bg-ember" />}
-        </View>
+        </View>}
         <View pointerEvents="none" className="flex-1" />
         <ChainPill now={now} />
         {growing ? null : <IconButton floating icon={icons.rules} label="Focus rules" onPress={() => router.push('/settings')} />}
       </View>
     </SafeAreaView>
 
-    {planning ? null : <SafeAreaView edges={['bottom']} pointerEvents="box-none" className="absolute bottom-0 left-0 right-0">
+    {/* No panel until the saved garden is read, so default settings never flash before the real ones. */}
+    {planning || storage === 'loading' ? null : <SafeAreaView edges={['bottom']} pointerEvents="box-none" className="absolute bottom-0 left-0 right-0">
       <Floating onLayout={(event) => setPanel(event.nativeEvent.layout.height)} className="mx-3 mb-2 gap-4 p-4">
-        {idle ? <>
+        {idle && storage === 'ready' ? <>
           {/* One summary of the next session (length, tag, what it grows); tapping it opens the session sheet. */}
           <Pressable accessibilityRole="button" accessibilityLabel={`Next session: ${[formatDuration(garden.duration), tag.label, ...stateParts].join(', ')}`} accessibilityHint="Opens the session settings"
             onPress={() => router.push('/session')} className="flex-row items-center gap-3 rounded-2xl active:opacity-60">
             <View className="flex-1 gap-0.5">
               <View className="flex-row items-center gap-3">
-                <Text style={numerals} className="text-title-1 font-semibold text-ink">{formatClock(garden.duration)}</Text>
+                <Text style={numerals} className="text-title-1 font-semibold text-ink">{formatDuration(garden.duration)}</Text>
                 <View className="flex-row items-center gap-1.5">
                   <View style={{ backgroundColor: tag.color }} className="h-2.5 w-2.5 rounded-full" />
                   <Text numberOfLines={1} className="text-subhead font-semibold text-ink-2">{tag.label}</Text>
@@ -134,17 +155,17 @@ export default function FocusScreen() {
           </Pressable>
           {linked ? <Button label="Plant" icon={verified ? icons.lock : undefined} disabled={storage !== 'ready'} onPress={start}
             accessibilityHint={verified ? 'Locks this session on Bitcoin Cash. The grown tree is sent to your wallet.' : undefined} />
-            : <Button label="Link wallet to plant" icon={icons.wallet} onPress={() => router.push('/link-wallet')} />}
+            : <Button label="Link your wallet to plant" icon={icons.wallet} onPress={() => router.push('/link-wallet')} />}
         </> : null}
 
         {growing ? <Animated.View entering={FadeInDown} className="gap-3">
           <View className="flex-row items-center gap-4">
-            <Arc progress={progress} size={76} stroke={5} accessibilityLabel={`Growing your ${reward.name.toLowerCase()}`}>
+            <Arc progress={progress} size={76} stroke={5} accessibilityLabel={`Growing your ${size}`}>
               <Text style={numerals} className="text-footnote font-semibold text-ink-2">{Math.round(progress * 100)}%</Text>
             </Arc>
             <View className="flex-1">
-              <Text accessibilityRole="timer" adjustsFontSizeToFit numberOfLines={1} style={numerals} className="text-display text-ink">{formatClock(remainingSeconds(timer, now) ?? 0)}</Text>
-              <Text numberOfLines={1} className="text-footnote text-ink-2">Growing a {reward.name.toLowerCase()} · {tag.label}{blocking ? ' · apps blocked' : ''}</Text>
+              <Text accessibilityRole="timer" accessibilityLabel={left >= 60 ? `${formatDuration(left)} left` : 'Less than a minute left'} adjustsFontSizeToFit numberOfLines={1} style={numerals} className="text-display text-ink">{formatClock(left)}</Text>
+              <Text numberOfLines={1} className="text-footnote text-ink-2">Growing a {size} · {tag.label}{blocking ? ' · apps blocked' : ''}</Text>
             </View>
           </View>
           <Button variant="destructive" size="medium" label="Give up" onPress={confirmGiveUp} />
@@ -152,13 +173,14 @@ export default function FocusScreen() {
 
         {timer.status === 'grown' || timer.status === 'withered' ? <Animated.View entering={FadeIn} className="gap-4">
           <View className="gap-0.5">
-            <Text className="text-title-3 text-ink">{timer.status === 'grown' ? `Your ${reward.name.toLowerCase()} joined your valley` : 'Your tree withered'}</Text>
-            <Text className="text-subhead text-ink-2">{timer.status === 'grown' ? `${Math.round(timer.duration / 60)} focused minutes${verified ? '. On its way to your wallet.' : ''}` : timer.reason === 'left-app' ? 'You left the app for too long.' : 'You gave up early.'}</Text>
+            <Text accessibilityRole="header" className="text-title-3 text-ink">{timer.status === 'grown' ? `Your ${size} joined your valley` : `Your ${size} withered`}</Text>
+            <Text className="text-subhead text-ink-2">{timer.status === 'grown' ? `${formatDuration(timer.duration)} focused${verified ? '. On its way to your wallet.' : ''}` : timer.reason === 'left-app' ? 'You left the app for too long.' : 'You gave up early.'}</Text>
           </View>
-          <Button label={timer.status === 'grown' ? 'Plant another' : 'Try again'} onPress={dismiss} />
+          {/* Returns to the next-session summary; planting stays one deliberate tap on Plant. */}
+          <Button label="Next session" onPress={dismiss} />
         </Animated.View> : null}
         {mergeStorage === 'error' ? <Notice tone="error">Your merges could not be read. Merging is paused and nothing was reset.</Notice> : null}
-        {storage === 'error' ? <Notice tone="error">Your valley could not be read or saved. Nothing was reset.</Notice> : null}
+        {storage === 'error' ? <Notice tone="error">{"Your valley couldn't be read or saved. Nothing was reset. Reopen the app to try again."}</Notice> : null}
       </Floating>
     </SafeAreaView>}
   </View>;

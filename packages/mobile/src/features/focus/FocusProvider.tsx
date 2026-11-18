@@ -1,5 +1,5 @@
 import * as Data from 'effect/Data';
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import Storage from 'expo-sqlite/kv-store';
@@ -106,29 +106,43 @@ function useGardenStore() {
     return () => { deactivateKeepAwake(KEEP_AWAKE_TAG).catch(() => undefined); };
   }, [growing]);
 
-  function update(change: (current: FocusGarden, time: number) => FocusGarden) {
-    if (storage !== 'ready') return;
-    const time = Date.now();
-    setNow(time);
-    setGarden((current) => change(current, time));
-  }
-  return {
-    garden,
-    storage,
-    now,
-    plant: () => update((current, time) => plantGarden(current, time, crypto.randomUUID())),
-    giveUp: () => update(giveUpGarden),
-    dismiss: () => update(dismissGarden),
-    configure: (change: Parameters<typeof configureGarden>[1]) => update((current) => configureGarden(current, change)),
-  };
+  // The actions read only `storage`, so they keep their identity while the clock ticks.
+  const actions = useMemo(() => {
+    function update(change: (current: FocusGarden, time: number) => FocusGarden) {
+      if (storage !== 'ready') return;
+      const time = Date.now();
+      setNow(time);
+      setGarden((current) => change(current, time));
+    }
+    return {
+      plant: () => update((current, time) => plantGarden(current, time, crypto.randomUUID())),
+      giveUp: () => update(giveUpGarden),
+      dismiss: () => update(dismissGarden),
+      configure: (change: Parameters<typeof configureGarden>[1]) => update((current) => configureGarden(current, change)),
+    };
+  }, [storage]);
+  return { garden, storage, now, actions };
 }
+
+type FocusStore = Pick<ReturnType<typeof useGardenStore>, 'garden' | 'storage'> & ReturnType<typeof useGardenStore>['actions'];
 
 class MissingFocusProvider extends Data.TaggedError('MissingFocusProvider') {}
 
-const FocusContext = createContext<ReturnType<typeof useGardenStore> | null>(null);
+const FocusContext = createContext<FocusStore | null>(null);
+/** The one-second clock, apart from the garden, so only components that call `useNow` tick with it. */
+const ClockContext = createContext(0);
+
 export function FocusProvider({ children }: { children: ReactNode }) {
-  const value = useGardenStore();
-  return <FocusContext.Provider value={value}>{children}</FocusContext.Provider>;
+  const { garden, storage, now, actions } = useGardenStore();
+  const value = useMemo((): FocusStore => ({ garden, storage, ...actions }), [garden, storage, actions]);
+  return <FocusContext.Provider value={value}><ClockContext.Provider value={now}>{children}</ClockContext.Provider></FocusContext.Provider>;
+}
+/**
+ * The current time, ticking every second. Only components that call this re-render with the clock;
+ * screens that never read it (a hidden Profile tab, an open sheet) stay still.
+ */
+export function useNow() {
+  return useContext(ClockContext);
 }
 export function useFocusGarden() {
   const value = useContext(FocusContext);

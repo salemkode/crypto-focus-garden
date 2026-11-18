@@ -70,14 +70,17 @@ export function LeaveDemo({ active, height }: DemoProps) {
   </DemoStage>;
 }
 
+/** Size names in sentence case, as everywhere else in the app ("Big tree"). */
+const sizeName = (name: string) => name.charAt(0) + name.slice(1).toLowerCase();
+
 /** Each reward size and the focus time it takes. */
 export function TiersDemo({ active, height }: DemoProps) {
   const scale = Math.min(1, height / 300);
-  const label = `Bigger trees for longer focus: ${REWARD_PRESETS.map((preset) => `${preset.name}, ${preset.label}`).join('; ')}`;
+  const label = `Bigger trees for longer focus: ${REWARD_PRESETS.map((preset) => `${sizeName(preset.name)}, ${preset.label}`).join('; ')}`;
   return <DemoStage height={height} label={label} className="flex-row items-end justify-center gap-1 px-3 pb-4">
     {REWARD_PRESETS.map((preset, index) => <Animated.View key={preset.tier} entering={active ? FadeInDown.delay(index * 120).springify() : undefined} className="flex-1 items-center gap-1.5">
       <ItemView tier={preset.tier} species={(['pine', 'oak', 'maple', 'cherry'] as const)[index]} seed={index + 2} size={Math.round([52, 66, 78, 86][index] * scale)} />
-      <Text numberOfLines={1} className="text-footnote font-semibold text-ink">{preset.name}</Text>
+      <Text numberOfLines={1} className="text-footnote font-semibold text-ink">{sizeName(preset.name)}</Text>
       <Text numberOfLines={1} style={numerals} className="text-caption text-ink-2">{preset.label}</Text>
     </Animated.View>)}
   </DemoStage>;

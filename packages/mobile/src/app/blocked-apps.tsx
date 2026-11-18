@@ -48,11 +48,13 @@ function AndroidBlockList() {
   const [apps, setApps] = useState<LaunchableApp[] | null>(null);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
+  const [failed, setFailed] = useState<'load' | 'save' | null>(null);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     Promise.all([FocusShield.listApps(), FocusShield.getBlockedPackages()])
-      .then(([list, blocked]) => { setApps(list); setChosen(new Set(blocked)); })
-      .catch(() => setApps([]));
-  }, []);
+      .then(([list, blocked]) => { setApps(list); setChosen(new Set(blocked)); setFailed(null); })
+      .catch(() => { setApps([]); setFailed('load'); });
+  }, [attempt]);
   const visible = useMemo(() => (apps ?? []).filter((app) => app.label.toLowerCase().includes(query.trim().toLowerCase())), [apps, query]);
   function toggle(packageName: string) {
     setChosen((current) => {
@@ -62,8 +64,10 @@ function AndroidBlockList() {
     });
   }
   async function save() {
-    await FocusShield.setBlockedPackages([...chosen]);
-    router.back();
+    try {
+      await FocusShield.setBlockedPackages([...chosen]);
+      router.back();
+    } catch { setFailed('save'); }
   }
   if (!apps) return <View className="flex-1 items-center justify-center bg-canvas"><ActivityIndicator color={color.moss} /></View>;
   return <View className="flex-1 bg-canvas">
@@ -78,15 +82,19 @@ function AndroidBlockList() {
       keyExtractor={(app) => app.packageName}
       contentContainerClassName="mx-4 my-2 overflow-hidden rounded-[20px] bg-surface"
       ItemSeparatorComponent={() => <View className="ml-[60px] h-px bg-divider" />}
-      renderItem={({ item }) => <Pressable accessibilityRole="switch" accessibilityState={{ checked: chosen.has(item.packageName) }} onPress={() => toggle(item.packageName)} className="min-h-14 flex-row items-center gap-3 px-4 py-2 active:bg-sunk">
+      renderItem={({ item }) => <Pressable accessibilityRole="switch" accessibilityLabel={item.label} accessibilityState={{ checked: chosen.has(item.packageName) }} onPress={() => toggle(item.packageName)} className="min-h-14 flex-row items-center gap-3 px-4 py-2 active:bg-sunk">
         {item.icon ? <Image source={{ uri: item.icon }} style={{ width: 32, height: 32, borderRadius: 8 }} /> : <View className="h-8 w-8 rounded-lg bg-sunk" />}
         <Text numberOfLines={1} className="flex-1 text-body text-ink">{item.label}</Text>
-        <Switch value={chosen.has(item.packageName)} onValueChange={() => toggle(item.packageName)} trackColor={{ true: color.moss, false: color.divider }} />
+        <Switch importantForAccessibility="no" value={chosen.has(item.packageName)} onValueChange={() => toggle(item.packageName)} trackColor={{ true: color.moss, false: color.divider }} />
       </Pressable>}
-      ListEmptyComponent={<Text className="py-10 text-center text-body text-ink-2">No apps match.</Text>}
+      ListEmptyComponent={failed === 'load'
+        ? <View className="items-center gap-3 py-10"><Text className="text-body text-ink-2">{"Your apps didn't load."}</Text><Button variant="secondary" size="medium" label="Try again" onPress={() => { setApps(null); setAttempt((value) => value + 1); }} /></View>
+        : <Text className="py-10 text-center text-body text-ink-2">{query.trim() ? 'No apps match.' : 'No apps found.'}</Text>}
     />
-    <View className="bg-canvas px-4 pb-6 pt-3">
+    {/* After a failed load the list is empty, so saving would clear the saved choice: no save button then. */}
+    {failed === 'load' ? null : <View className="gap-3 bg-canvas px-4 pb-6 pt-3">
+      {failed === 'save' ? <Notice tone="error">{"Your blocked apps weren't saved. Try again."}</Notice> : null}
       <Button label={`Block ${chosen.size} ${chosen.size === 1 ? 'app' : 'apps'}`} onPress={save} />
-    </View>
+    </View>}
   </View>;
 }

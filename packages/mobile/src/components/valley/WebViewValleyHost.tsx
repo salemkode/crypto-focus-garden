@@ -2,13 +2,19 @@ import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, type Comp
 import { PanResponder, StyleSheet, View, type GestureResponderEvent } from 'react-native';
 import { WebView as RNWebView } from 'react-native-webview';
 import type { AndroidWebViewProps, IOSWebViewProps, WebViewMessageEvent } from 'react-native-webview/lib/WebViewTypes';
-import { VALLEY_HTML } from './embed/html.generated';
 import type { FromValley, ToValley, ValleyHostHandle } from './protocol';
 
 // react-native-webview 14 types its export so that, with this app's React 19 types, every prop
 // resolves to `never`. The iOS and Android prop types themselves are fine, so name them directly.
 type WebViewHandle = { injectJavaScript: (script: string) => void; reload: () => void };
 const WebView = RNWebView as unknown as ComponentType<IOSWebViewProps & AndroidWebViewProps & { ref?: Ref<WebViewHandle> }>;
+
+/**
+ * The page (about 590,000 characters, 1.2 MB as a JavaScript string) is required on first render, not at
+ * launch: with Filament, the default on phones, this host only renders as the fallback.
+ */
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- a lazy require is the point
+const valleyHtml = () => (require('./embed/html.generated') as typeof import('./embed/html.generated')).VALLEY_HTML;
 
 /**
  * The valley on iOS and Android: the engine runs in a WebView (JavaScript with a JIT, WebGL on the
@@ -57,7 +63,7 @@ export function WebViewValleyHost({ ref, onMessage }: { ref: Ref<ValleyHostHandl
   return <View style={styles.fill}>
     <WebView
       ref={web}
-      source={{ html: VALLEY_HTML, baseUrl: 'https://valley.focusgarden.local/' }}
+      source={{ html: valleyHtml(), baseUrl: 'https://valley.focusgarden.local/' }}
       originWhitelist={['https://valley.focusgarden.local']}
       onMessage={receive}
       style={styles.web}

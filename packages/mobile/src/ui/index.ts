@@ -1,9 +1,11 @@
 export { Arc } from './Arc';
 export { Button, IconButton } from './Button';
 export { Chip } from './Chip';
+export { EmptyState } from './EmptyState';
 export { MenuPicker, StepperRow, type MenuOption } from './Choice';
 export { Field } from './Field';
 export { Floating } from './Floating';
+export { Footnote } from './Footnote';
 export { ChoiceRow, Group, Row, SwitchRow } from './Group';
 export { Icon, icons, type IconName } from './Icon';
 export { Notice } from './Notice';

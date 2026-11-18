@@ -18,8 +18,8 @@ export default function OnBitcoinScreen() {
       <Row title="Anyone can check it" detail="Every tree is a public transaction" icon={icons.contract} iconTint={color.moss} />
     </Group>
 
-    <Group title="Why 8½ minutes?" footer="Bitcoin Cash counts time locks in 512-second steps. Practice sessions can be any length.">
-      {REWARD_PRESETS.map((preset) => <Row key={preset.tier} title={preset.name} detail={STEPS[preset.tier]} value={preset.label} />)}
+    <Group title="Why steps of 8 min 32 s?" footer="Bitcoin Cash counts time locks in 512-second steps, so every session is a whole number of them.">
+      {REWARD_PRESETS.map((preset) => <Row key={preset.tier} title={preset.name.charAt(0) + preset.name.slice(1).toLowerCase()} detail={STEPS[preset.tier]} value={preset.label} />)}
     </Group>
 
     <Group title="Why it's ready a little after the timer" footer="Your tree is safe in the contract the whole time.">
