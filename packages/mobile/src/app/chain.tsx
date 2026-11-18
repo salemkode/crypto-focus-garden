@@ -1,18 +1,26 @@
+import { useState } from 'react';
 import { router } from 'expo-router';
 import { Text } from 'react-native';
 import { OnChainSession } from '../components/OnChainSession';
 import { RewardActions } from '../components/RewardActions';
+import { useRewards } from '../features/rewards/RewardProvider';
 import { color, Group, icons, Row, Screen } from '../ui';
 
-const INTRO = "A verified tree is a collectible on Bitcoin Cash. One public contract holds every player's trees until their focus time has passed, then sends each to its owner's wallet.";
-
 export default function ChainScreen() {
-  return <Screen>
-    <Text className="px-4 text-body text-ink-2">{INTRO}</Text>
+  const rewards = useRewards();
+  const [refreshing, setRefreshing] = useState(false);
+  function refresh() {
+    // Same guard as the refresh rows: only when the wallet is open and nothing else is running.
+    if (rewards.status !== 'ready' || !rewards.account) return;
+    setRefreshing(true);
+    void rewards.refresh().finally(() => setRefreshing(false));
+  }
+  return <Screen onRefresh={rewards.account ? refresh : undefined} refreshing={refreshing}>
+    <Text className="px-4 text-subhead text-ink-2">Grow trees on the Bitcoin Cash test network and keep them in your wallet.</Text>
     <OnChainSession />
     <RewardActions />
     <Group>
-      <Row title="Why the wait?" detail="One contract for everyone, and timing set by Bitcoin" icon={icons.hourglass} iconTint={color.sunInk} onPress={() => router.push('/on-bitcoin')} chevron />
+      <Row title="Why the wait?" icon={icons.hourglass} iconTint={color.ink2} onPress={() => router.push('/on-bitcoin')} chevron />
     </Group>
   </Screen>;
 }

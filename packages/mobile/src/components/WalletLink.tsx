@@ -18,9 +18,9 @@ const LOGO = {
 } as const;
 
 /**
- * Links the user's own wallet, where grown trees are sent. WalletConnect and WizardConnect are the
- * two ways in; Selene and Paytaca are shortcuts that open one of them straight in that wallet.
- * Focus Garden's helper wallet only pays the network fee and signs the planting.
+ * Links the user's own wallet, where grown trees are sent. Selene and Paytaca open WizardConnect or
+ * WalletConnect straight in that wallet; the two protocol rows serve any other wallet by link or QR
+ * code. The Focus Garden wallet only pays the network fee and signs the planting.
  */
 export const WalletLink = nativeAware(function WalletLink({ onLinked }: { onLinked?: () => void }) {
   const rewards = useRewards();
@@ -30,6 +30,10 @@ export const WalletLink = nativeAware(function WalletLink({ onLinked }: { onLink
   const linked = rewards.recipient;
   const info = linked ? readLinkInfo(linked) : null;
   const ready = rewards.status === 'ready';
+  // Change mode belongs to the address it started from, so it ends by itself once a new wallet is linked.
+  const [changeFrom, setChangeFrom] = useState('');
+  const changing = Boolean(linked) && changeFrom === linked;
+  const choosing = !linked || changing;
 
   async function saveManual() {
     if (!await rewards.saveRecipient(draft)) return;
@@ -55,30 +59,32 @@ export const WalletLink = nativeAware(function WalletLink({ onLinked }: { onLink
   }
 
   return <>
-    {linked ? <Group title="Linked wallet">
-      <Row title={info?.walletName ?? 'Your wallet'} detail={short(linked)} icon={icons.checkCircle} iconTint={color.moss} value={info ? METHOD_NAME[info.method] : undefined} />
+    {linked ? <Group footer="Your trees are sent to this wallet.">
+      <Row title={info?.walletName ?? 'Your wallet'} detail={short(linked)} icon={icons.checkCircle} iconTint={color.moss} value={info ? METHOD_NAME[info.method] : undefined}
+        trailingIcon={icons.copy} accessibilityLabel={`${info?.walletName ?? 'Your wallet'}, linked. Copy address`}
+        onPress={() => { void Clipboard.setStringAsync(linked); void Haptics.selectionAsync(); }} />
+      <Row title={changing ? 'Keep this wallet' : 'Change wallet'} disabled={!ready} onPress={() => { setChangeFrom(changing ? '' : linked); setManual(false); }} chevron={!changing} />
     </Group> : null}
 
-    <Group title={linked ? 'Change wallet' : 'Connect'} footer="Focus Garden only reads your address.">
-      <Row title="WalletConnect" image={LOGO.walletconnect} disabled={!ready || !walletConnectAvailable} onPress={() => void link.start('walletconnect')} chevron />
-      <Row title="WizardConnect" image={LOGO.wizardconnect} disabled={!ready} onPress={() => void link.start('wizardconnect')} chevron />
-    </Group>
+    {choosing ? <>
+      <Group title="Choose your wallet" footer="Focus Garden only reads your address.">
+        {WALLET_APPS.map((app) => <Row key={app.id} title={app.name} detail={app.id === 'selene' ? 'Recommended' : undefined} image={LOGO[app.id]}
+          disabled={!ready || (app.method === 'walletconnect' && !walletConnectAvailable)} onPress={() => void link.start(app.method, app)} chevron />)}
+        <Row title="WalletConnect" detail="Other wallets" image={LOGO.walletconnect} disabled={!ready || !walletConnectAvailable} onPress={() => void link.start('walletconnect')} chevron />
+        <Row title="WizardConnect" detail="Other wallets" image={LOGO.wizardconnect} disabled={!ready} onPress={() => void link.start('wizardconnect')} chevron />
+      </Group>
 
-    <Group title="Shortcuts">
-      {WALLET_APPS.map((app) => <Row key={app.id} title={app.name} image={LOGO[app.id]}
-        disabled={!ready || (app.method === 'walletconnect' && !walletConnectAvailable)} onPress={() => void link.start(app.method, app)} chevron />)}
-    </Group>
+      <Group>
+        <Row title={manual ? 'Hide address entry' : 'Enter an address instead'} icon={icons.note} iconTint={color.ink2} onPress={() => setManual(!manual)} chevron={!manual} />
+      </Group>
 
-    <Group>
-      <Row title={manual ? 'Hide address entry' : 'Enter an address'} onPress={() => setManual(!manual)} chevron={!manual} />
-    </Group>
-
-    {manual ? <>
-      <Field label="Chipnet address" value={draft} onChangeText={setDraft} autoCorrect={false} autoCapitalize="none" placeholder="bchtest:" />
-      <Button variant="secondary" label={linked ? 'Change wallet' : 'Link this address'} disabled={!draft.trim() || !ready} onPress={() => void saveManual()} />
+      {manual ? <>
+        <Field label="Chipnet address" value={draft} onChangeText={setDraft} autoCorrect={false} autoCapitalize="none" placeholder="bchtest:" />
+        <Button variant="secondary" label="Link this address" disabled={!draft.trim() || !ready} onPress={() => void saveManual()} />
+      </> : null}
     </> : null}
 
     {link.error ? <Notice tone="error">{link.error}</Notice> : rewards.notice ? <Notice>{rewards.notice}</Notice> : null}
-    {!ready ? <Text className="px-4 text-footnote text-ink-2">Waiting for the helper wallet to open.</Text> : null}
+    {!ready ? <Text className="px-4 text-footnote text-ink-2">Opening your wallets…</Text> : null}
   </>;
 });

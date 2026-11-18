@@ -1,56 +1,64 @@
-import { Pressable, ScrollView, Text } from 'react-native';
+import { router } from 'expo-router';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { ItemView } from '../components/ItemView';
-import { levelForSeconds, levelName, MAX_SESSION, SESSION_PRESETS, SESSION_STEP, SPECIES, TAGS } from '../features/focus/catalog';
+import { levelForSeconds, levelName, MAX_SESSION, SESSION_STEP, SPECIES, TAGS } from '../features/focus/catalog';
 import { useFocusGarden } from '../features/focus/FocusProvider';
+import { formatDuration } from '../features/focus/stats';
 import { useRewards } from '../features/rewards/RewardProvider';
 import { useShield } from '../features/shield/useShield';
-import { Button, color, Group, icons, MenuPicker, Row, Screen, Segmented, Stage, StepperRow, SwitchRow } from '../ui';
+import { color, Group, Icon, icons, MenuPicker, Row, Screen, Stage, SwitchRow } from '../ui';
 
-const shortName = (name: string) => { const last = name.split(' ').pop()!; return last[0].toUpperCase() + last.slice(1); };
-const PRESETS = SESSION_PRESETS.map((preset) => ({ id: String(preset.seconds), label: preset.label }));
 const TAG_OPTIONS = TAGS.map((tag) => ({ id: tag.id, label: tag.label, color: tag.color }));
+/** One option per 512-second step (Bitcoin Cash lock steps), up to seven: just under an hour. */
+const STEPS = Array.from({ length: MAX_SESSION / SESSION_STEP }, (_, index) => (index + 1) * SESSION_STEP);
+const lengthLabel = (seconds: number) => `${formatDuration(seconds)} · ${levelName(levelForSeconds(seconds))}`;
 
-/** Everything about the next session on one sheet: length, tree, tag, verification and app blocking. */
+/** The next session on one sheet: length, tree, tag and whether it is verified. */
 export default function SessionSheet() {
   const { garden, configure } = useFocusGarden();
   const rewards = useRewards();
   const shield = useShield();
   const locked = garden.timer.status === 'growing';
-  const canVerify = Boolean(rewards.account && rewards.recipient && rewards.data.state === 'connected');
+  const linked = Boolean(rewards.recipient);
+  const canVerify = Boolean(rewards.account && linked && rewards.data.state === 'connected');
   const pick = (change: Parameters<typeof configure>[0]) => { configure(change); void Haptics.selectionAsync(); };
-  async function toggleBlocking(next: boolean) {
-    if (next && !shield.ready) await shield.continueSetup();
-    pick({ blockApps: next });
-  }
-  // Sessions grow in steps of 512 seconds, up to seven (just under an hour). Longer focus is
-  // several sessions merged together in the valley.
-  const minutes = Math.round(garden.duration / 60);
-  const preset = SESSION_PRESETS.some((entry) => entry.seconds === garden.duration) ? String(garden.duration) : '';
-  return <Screen>
-    <Group title="Length" footer={`Grows a ${levelName(levelForSeconds(garden.duration)).toLowerCase()}. Up to an hour; for longer focus, plant again and merge.`}>
-      <StepperRow title={`${minutes} min`} value={garden.duration} step={SESSION_STEP} min={Math.min(SESSION_STEP, garden.duration)} max={MAX_SESSION} disabled={locked} onChange={(next) => configure({ duration: next })} />
-      <Segmented options={PRESETS} value={preset} disabled={locked} onChange={(next) => pick({ duration: Number(next) })} />
-    </Group>
-    {__DEV__ ? <Button variant="plain" size="small" label="1-minute session (test build)" onPress={() => pick({ duration: 60 })} /> : null}
 
-    <Group title="Tree">
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 p-3">{SPECIES.map((entry) => {
-        const chosen = garden.species === entry.id;
-        return <Pressable key={entry.id} accessibilityRole="radio" accessibilityLabel={entry.name} accessibilityState={{ checked: chosen, disabled: locked }} disabled={locked} onPress={() => pick({ species: entry.id })} className="items-center gap-1.5 active:opacity-70 disabled:opacity-40">
-          <Stage style={{ width: 72, height: 84, borderWidth: chosen ? 2.5 : 0, borderColor: color.moss }}><ItemView tier="tree" species={entry.id} seed={2} size={52} /></Stage>
-          <Text numberOfLines={1} className={chosen ? 'text-footnote font-semibold text-ink' : 'text-footnote text-ink-2'}>{shortName(entry.name)}</Text>
-        </Pressable>;
-      })}</ScrollView>
+  // Every step length is offered. Test builds add a 1-minute session; any other saved length
+  // (from an older version) stays visible until the user picks a new one.
+  const lengths = [
+    ...STEPS.map((seconds) => ({ id: String(seconds), label: lengthLabel(seconds) })),
+    ...(__DEV__ ? [{ id: '60', label: '1 min · test build' }] : []),
+  ];
+  if (!lengths.some((option) => option.id === String(garden.duration))) lengths.push({ id: String(garden.duration), label: lengthLabel(garden.duration) });
+  const blocking = !garden.blockApps ? 'Off' : shield.ready ? `${shield.status!.selectionCount} apps` : 'Set up';
+
+  return <Screen>
+    <Group footer="For longer focus, plant again and merge.">
+      <MenuPicker title="Length" options={lengths} value={String(garden.duration)} disabled={locked} onChange={(next) => configure({ duration: Number(next) })} />
       <MenuPicker title="Tag" options={TAG_OPTIONS} value={garden.tag} disabled={locked} onChange={(next) => configure({ tag: next })} />
     </Group>
 
-    <Group footer={canVerify ? 'A verified tree is locked on Bitcoin Cash and sent to your wallet when it grows.' : 'Link your wallet and set up the helper wallet in Profile to verify.'}>
-      <SwitchRow title="Verify on Bitcoin Cash" icon={icons.lock} iconTint={color.bch} value={garden.verify && canVerify} disabled={locked || !canVerify} onValueChange={(next) => pick({ verify: next })} />
-      <SwitchRow title="Block apps" detail={shield.nextStep === 'unsupported' ? shield.stepLabel ?? undefined : shield.status?.selectionCount ? `${shield.status.selectionCount} chosen` : undefined} icon={icons.shield} iconTint={color.ember}
-        value={garden.blockApps} disabled={locked || shield.nextStep === 'unsupported'} onValueChange={toggleBlocking} />
-      {garden.blockApps && shield.stepLabel && shield.nextStep !== 'unsupported' ? <Row title={shield.stepLabel} onPress={shield.continueSetup} chevron /> : null}
-      {shield.ready ? <Row title="Choose blocked apps" disabled={locked} onPress={shield.chooseApps} chevron /> : null}
+    <Group title="Tree">
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-3 p-3">{SPECIES.map((entry) => {
+        const chosen = garden.species === entry.id;
+        return <Pressable key={entry.id} accessibilityRole="radio" accessibilityLabel={entry.name} accessibilityState={{ checked: chosen, disabled: locked }} disabled={locked}
+          onPress={() => pick({ species: entry.id })} className="w-[84px] items-center gap-1.5 active:opacity-70 disabled:opacity-40">
+          <Stage style={{ width: 84, height: 96, borderWidth: chosen ? 3 : 0, borderColor: color.moss }}>
+            <ItemView tier="tree" species={entry.id} seed={2} size={56} />
+            {chosen ? <View className="absolute right-1.5 top-1.5 rounded-full bg-surface"><Icon name={icons.checkCircle} size={20} tint={color.moss} /></View> : null}
+          </Stage>
+          <Text numberOfLines={2} className={chosen ? 'text-center text-footnote font-semibold text-moss' : 'text-center text-footnote text-ink-2'}>{entry.name}</Text>
+        </Pressable>;
+      })}</ScrollView>
+    </Group>
+
+    <Group footer={canVerify ? 'Locked on Bitcoin Cash and sent to your wallet when it grows.' : undefined}>
+      {canVerify ? <SwitchRow title="Verify on Bitcoin Cash" icon={icons.lock} iconTint={color.bch} value={garden.verify} disabled={locked} onValueChange={(next) => pick({ verify: next })} />
+        : !linked ? <Row title="Link your wallet to verify" icon={icons.lock} iconTint={color.bch} onPress={() => router.push('/link-wallet')} chevron />
+        : !rewards.account ? <Row title="Set up Focus Garden wallet to verify" icon={icons.lock} iconTint={color.bch} onPress={() => router.navigate('/profile')} chevron />
+        : <Row title="Verify on Bitcoin Cash" detail="Not available right now" icon={icons.lock} iconTint={color.bch} />}
+      <Row title="Block apps" icon={icons.shield} iconTint={color.ember} value={blocking} onPress={() => router.push('/settings')} chevron />
     </Group>
   </Screen>;
 }

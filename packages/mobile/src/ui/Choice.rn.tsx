@@ -16,7 +16,7 @@ export function MenuPicker<T extends string>({ title, options, value, onChange, 
         const selected = option.id === value;
         return <Pressable key={option.id} accessibilityRole="radio" accessibilityState={{ checked: selected, disabled: Boolean(disabled) }} disabled={disabled}
           onPress={() => { onChange(option.id); void Haptics.selectionAsync(); }}
-          className={selected ? 'min-h-9 flex-row items-center gap-2 rounded-full bg-ink px-3.5 disabled:opacity-40' : 'min-h-9 flex-row items-center gap-2 rounded-full bg-sunk px-3.5 active:opacity-70 disabled:opacity-40'}>
+          className={selected ? 'min-h-9 flex-row items-center gap-2 rounded-full bg-moss px-3.5 disabled:opacity-40' : 'min-h-9 flex-row items-center gap-2 rounded-full bg-sunk px-3.5 active:opacity-70 disabled:opacity-40'}>
           {option.color ? <View style={{ backgroundColor: option.color }} className="h-2.5 w-2.5 rounded-full" /> : null}
           <Text className={selected ? 'text-subhead font-semibold text-surface' : 'text-subhead text-ink'}>{option.label}</Text>
         </Pressable>;

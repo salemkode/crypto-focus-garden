@@ -1,98 +1,133 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { router } from 'expo-router';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, useWindowDimensions, View, type ScrollViewInstance } from 'react-native';
+import { AccessibilityInfo, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, useWindowDimensions, View, type ScrollViewInstance } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeIn } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { BlockDemo, ClockDemo, ContractDemo, LeaveDemo, PlantDemo, TiersDemo } from '../components/onboarding/Demos';
-import { Model3D } from '../components/Model3D';
+import { BlockDemo, LeaveDemo, PlantDemo, TiersDemo, type DemoProps } from '../components/onboarding/Demos';
 import { WalletLink } from '../components/WalletLink';
 import { useFocusGarden } from '../features/focus/FocusProvider';
 import { useRewards } from '../features/rewards/RewardProvider';
 import { useShield } from '../features/shield/useShield';
-import { markOnboarded, readDisplayName, saveDisplayName } from '../features/profile/local';
-import { Button, color, Field, icons, Stage } from '../ui';
+import { markOnboarded } from '../features/profile/local';
+import { Button, color, icons } from '../ui';
 
-type Extra = 'block' | 'bitcoin';
-const PAGES: { title: string; body: string; Demo: (props: { active: boolean }) => ReactNode; extra?: Extra }[] = [
-  { title: 'Plant a tree, then stay.', body: 'Pick how long to focus and tap Plant. The tree grows while you work, and it is fully grown when the timer ends.', Demo: PlantDemo },
-  { title: 'Leave, and it withers.', body: "Leaving Focus Garden for more than 10 seconds, or giving up, withers the tree. Calls and notifications don't count.", Demo: LeaveDemo },
-  { title: 'Block what distracts you.', body: 'Choose apps to block while a tree grows. iOS shows Screen Time instead of the app, and blocking ends by itself when the tree is grown.', Demo: BlockDemo, extra: 'block' },
-  { title: 'Longer focus, bigger trees.', body: 'Short sessions grow sprouts, longer ones grow trees. Merge three sprouts into a tree, and keep merging up to a house.', Demo: TiersDemo },
-  { title: 'One contract for everyone.', body: "Verified trees go into one public contract on Bitcoin Cash, shared by every player. It sends each tree only to its owner's wallet. Not even Focus Garden can take or move it.", Demo: ContractDemo },
-  { title: 'Bitcoin sets the clock.', body: 'Bitcoin Cash counts time locks in 512-second steps (about 8½ minutes) and adds a block about every 10 minutes. That timing comes from Bitcoin, not from us, so a verified tree is ready a little after your timer.', Demo: ClockDemo, extra: 'bitcoin' },
+const INTRO: { title: string; body: string; Demo: (props: DemoProps) => ReactNode }[] = [
+  { title: 'Plant a tree, then stay', body: 'It grows while you focus and is fully grown when the timer ends.', Demo: PlantDemo },
+  { title: 'Leave, and it withers', body: "Leaving for more than 10 seconds withers the tree. Calls and notifications don't count.", Demo: LeaveDemo },
+  { title: 'Longer focus, bigger trees', body: 'Merge three sprouts into a tree, and keep merging up to a house.', Demo: TiersDemo },
+  { title: 'Block what distracts you', body: 'Chosen apps stay closed until your tree has grown.', Demo: BlockDemo },
 ];
+const BLOCK_PAGE = 3;
+const WALLET_TITLE = 'Link your wallet';
+/** The intro pages, then your wallet. */
+const COUNT = INTRO.length + 1;
+const LAST = COUNT - 1;
+const TITLES = [...INTRO.map((entry) => entry.title), WALLET_TITLE];
 
-/** First-run introduction: six pages with live demos (including app blocking setup and how Bitcoin Cash sets the timing), your name, then linking your wallet, where your trees are sent. */
+/** Only the page on screen is read by VoiceOver and TalkBack. */
+const hiddenWhen = (hidden: boolean) => ({ accessibilityElementsHidden: hidden, importantForAccessibility: hidden ? 'no-hide-descendants' as const : 'auto' as const });
+
+/**
+ * First-run introduction: four pages with live demos (planting, withering, tree sizes, optional app
+ * blocking), then linking your wallet, where your trees are sent. The demo stage, the text and the
+ * footer sit in the same place on every page; each page has one primary button.
+ */
 export default function Welcome() {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
+  const stage = Math.min(300, Math.round(height * 0.36));
   const scroller = useRef<ScrollViewInstance>(null);
   const [page, setPage] = useState(0);
-  const [name, setName] = useState(readDisplayName);
+  const [asking, setAsking] = useState(false);
   const rewards = useRewards();
   const shield = useShield();
   const { configure } = useFocusGarden();
   const linked = Boolean(rewards.recipient);
-  // Pages: the intro pages, your name, then your wallet.
-  const last = PAGES.length + 1;
+  /** On the blocking page, Screen Time (or usage) access is the main action until it is granted. */
+  const asksPermission = page === BLOCK_PAGE && shield.nextStep === 'authorize';
+
   function go(next: number) {
+    if (next < 0 || next > LAST) return;
     scroller.current?.scrollTo({ x: next * width, animated: true });
     setPage(next);
     void Haptics.selectionAsync();
+    AccessibilityInfo.announceForAccessibility(`${TITLES[next]}. Page ${next + 1} of ${COUNT}`);
   }
   function finish() {
-    if (name.trim()) saveDisplayName(name);
     markOnboarded();
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     if (router.canGoBack()) router.back(); else router.replace('/');
   }
+  async function allowBlocking() {
+    setAsking(true);
+    try {
+      await shield.continueSetup();
+      configure({ blockApps: true });
+    } finally { setAsking(false); }
+  }
+
+  const primary = page < LAST
+    ? asksPermission
+      ? <Button label={shield.stepLabel ?? 'Allow Screen Time access'} icon={icons.hourglass} busy={asking} onPress={() => void allowBlocking()} />
+      : <Button label="Continue" onPress={() => go(page + 1)} />
+    : linked
+      ? <Button label="Start focusing" onPress={finish} />
+      : <Button label="Not now" variant="secondary" onPress={finish} />;
+
   return <SafeAreaView className="flex-1 bg-canvas">
     <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View className="flex-row justify-end px-4 pt-1"><Button variant="plain" size="medium" label="Skip" onPress={finish} /></View>
       <ScrollView ref={scroller} horizontal pagingEnabled showsHorizontalScrollIndicator={false} scrollEventThrottle={16} onMomentumScrollEnd={(event) => setPage(Math.round(event.nativeEvent.contentOffset.x / width))} keyboardShouldPersistTaps="handled">
-        {PAGES.map((entry, index) => <ScrollView key={entry.title} style={{ width }} contentContainerClassName="flex-grow justify-center gap-7 px-6 py-4" showsVerticalScrollIndicator={false}>
-          <entry.Demo active={page === index} />
-          <View className="gap-3 px-2">
-            <Text className="text-large-title text-ink">{entry.title}</Text>
+        {INTRO.map((entry, index) => <ScrollView key={entry.title} style={{ width }} contentContainerClassName="flex-grow gap-7 px-6 pb-4 pt-3" showsVerticalScrollIndicator={false} {...hiddenWhen(index !== page)}>
+          <entry.Demo active={page === index} height={stage} />
+          <View className="gap-2 px-2">
+            <Text accessibilityRole="header" className="text-title-1 text-ink">{entry.title}</Text>
             <Text className="text-body text-ink-2">{entry.body}</Text>
           </View>
-          {entry.extra === 'block' ? <BlockSetup shield={shield} onUse={() => configure({ blockApps: true })} /> : null}
-          {entry.extra === 'bitcoin' ? <View className="items-start"><Button variant="plain" size="medium" label="Learn more" onPress={() => router.push('/on-bitcoin')} /></View> : null}
+          {index === BLOCK_PAGE ? <BlockSetup shield={shield} onUse={() => configure({ blockApps: true })} /> : null}
         </ScrollView>)}
-        <View style={{ width }} className="flex-1 justify-center gap-6 px-6">
-          <Animated.View entering={FadeIn} className="items-center"><Stage round style={{ width: 168, height: 168 }}><Model3D spec={{ tier: 'sprout', species: 'oak', seed: 5 }} size={160} /></Stage></Animated.View>
-          <View className="gap-3 px-2">
-            <Text className="text-large-title text-ink">What should we call you?</Text>
-            <Text className="text-body text-ink-2">It stays on your phone unless you create a public profile.</Text>
-          </View>
-          <Field label="Your name" autoCorrect={false} autoCapitalize="words" textContentType="nickname" value={name} onChangeText={setName} maxLength={32} placeholder="Name" returnKeyType="next" onSubmitEditing={() => go(PAGES.length + 1)} />
-        </View>
-        <ScrollView style={{ width }} contentContainerClassName="flex-grow justify-center gap-6 px-6 py-6" keyboardShouldPersistTaps="handled">
-          <View className="gap-3 px-2">
-            <Text className="text-large-title text-ink">Link your wallet</Text>
-            <Text className="text-body text-ink-2">Your trees are sent to your own wallet.</Text>
+        <ScrollView style={{ width }} contentContainerClassName="flex-grow gap-6 px-6 pb-4 pt-3" keyboardShouldPersistTaps="handled" {...hiddenWhen(page !== LAST)}>
+          <View className="gap-2 px-2">
+            <Text accessibilityRole="header" className="text-title-1 text-ink">{WALLET_TITLE}</Text>
+            <Text className="text-body text-ink-2">A public Bitcoin Cash contract sends your grown trees there.</Text>
+            <Pressable accessibilityRole="link" accessibilityHint="How verified trees and their timing work on Bitcoin Cash" hitSlop={8} onPress={() => router.push('/on-bitcoin')} className="min-h-11 justify-center self-start active:opacity-70">
+              <Text className="text-callout font-semibold text-moss">Learn more</Text>
+            </Pressable>
           </View>
           <WalletLink />
         </ScrollView>
       </ScrollView>
-      <View className="gap-5 px-6 pb-4">
-        <View accessibilityLabel={`Page ${page + 1} of ${last + 1}`} className="flex-row justify-center gap-1.5 pt-[4px]">{Array.from({ length: last + 1 }, (_, index) => <View key={index} style={{ width: index === page ? 20 : 7, backgroundColor: index === page ? color.moss : color.divider }} className="h-[7px] rounded-full" />)}</View>
-        <Button label={page < last ? 'Continue' : linked ? 'Start focusing' : 'Not now'} variant={page < last || linked ? 'primary' : 'secondary'} onPress={() => (page < last ? go(page + 1) : finish())} />
+      <View className="gap-3 px-6 pb-2 pt-2">
+        <View accessible accessibilityRole="adjustable" accessibilityLabel={`Page ${page + 1} of ${COUNT}`}
+          accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+          onAccessibilityAction={(event) => go(page + (event.nativeEvent.actionName === 'increment' ? 1 : -1))}
+          className="flex-row justify-center gap-1.5 py-1">
+          {Array.from({ length: COUNT }, (_, index) => <View key={index} style={{ width: index === page ? 20 : 7, backgroundColor: index === page ? color.moss : color.divider }} className="h-[7px] rounded-full" />)}
+        </View>
+        {primary}
+        {/* A fixed slot so the footer keeps its height when a page has a way to decline. */}
+        <View className="min-h-11 justify-center">
+          {asksPermission ? <Button variant="plain" size="medium" label="Not now" onPress={() => go(page + 1)} /> : null}
+        </View>
       </View>
     </KeyboardAvoidingView>
   </SafeAreaView>;
 }
 
-/** The blocking page's setup: one button that walks through Screen Time access, then the picker. */
+/**
+ * The rest of the blocking setup once access is granted (Android's overlay step, choosing apps,
+ * changing them), plus Apple's privacy note or the reason access failed. Access itself is the
+ * page's primary button.
+ */
 function BlockSetup({ shield, onUse }: { shield: ReturnType<typeof useShield>; onUse: () => void }) {
   const status = shield.status;
   if (!status?.supported) {
     return <Text className="px-2 text-footnote text-ink-2">{status?.pendingApproval ? 'This copy of Focus Garden was built without app blocking.' : 'App blocking works in the iPhone and Android apps.'}</Text>;
   }
-  const label = shield.ready ? `${status.selectionCount} blocked · Change` : shield.stepLabel ?? 'Set up blocking';
+  const step = shield.ready ? `${status.selectionCount} blocked · Change` : shield.nextStep !== 'authorize' ? shield.stepLabel : null;
+  const note = shield.error ?? (Platform.OS === 'ios' ? 'Apple keeps your choices private, even from Focus Garden.' : null);
   return <View className="gap-2">
-    <Button variant={shield.ready ? 'secondary' : 'primary'} size="medium" icon={shield.ready ? icons.checkCircle : icons.hourglass} label={label}
-      onPress={async () => { if (shield.ready) await shield.chooseApps(); else await shield.continueSetup(); onUse(); }} />
-    <Text className={`px-2 text-footnote ${shield.error ? 'text-ember' : 'text-ink-2'}`}>{shield.error ?? 'Apple keeps your choices private, even from Focus Garden.'}</Text>
+    {step ? <Button variant="secondary" size="medium" icon={shield.ready ? icons.checkCircle : icons.hourglass} label={step}
+      onPress={async () => { if (shield.ready) await shield.chooseApps(); else await shield.continueSetup(); onUse(); }} /> : null}
+    {note ? <Text className={`px-2 text-footnote ${shield.error ? 'text-ember' : 'text-ink-2'}`}>{note}</Text> : null}
   </View>;
 }

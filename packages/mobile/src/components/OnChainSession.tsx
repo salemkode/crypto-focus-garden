@@ -6,9 +6,13 @@ import { useFocusGarden } from '../features/focus/FocusProvider';
 import { onchainSessionView } from '../features/focus/onchain-session';
 import { rewardAddressOf } from '../features/forest/address';
 import { nftTree } from '../features/forest/nft-style';
-import { formatClock } from '../features/focus/stats';
+import { formatClock, formatDuration } from '../features/focus/stats';
+import { REWARD_PRESETS } from '../features/focus/catalog';
 import { Arc, continuous, Group, nativeAware, Notice, numerals, Row, Stage } from '../ui';
 import { ItemView } from './ItemView';
+
+/** Lock length in the same words as the tier presets ("25½ min"), falling back to whole minutes. */
+const lockLabel = (seconds: number) => REWARD_PRESETS.find((preset) => preset.seconds === seconds)?.label ?? formatDuration(seconds);
 
 /** The reward currently growing (or being claimed or merged) on chain. */
 export const OnChainSession = nativeAware(function OnChainSession() {
@@ -34,12 +38,12 @@ export const OnChainSession = nativeAware(function OnChainSession() {
         <Text className="text-footnote text-ink-2">{view.message}</Text>
       </View>
     </View>
-    <Text className="px-4 text-footnote text-ink-2">The time is an estimate. The blockchain decides when it is ready, usually within a few minutes of it.</Text>
+    <Text className="px-4 text-footnote text-ink-2">The time left is an estimate. Bitcoin Cash sets the exact moment, usually within minutes.</Text>
     {rewards.freshness !== 'current' ? <Notice tone="warning">{`Last checked ${rewards.checkedAt ? new Date(rewards.checkedAt).toLocaleString() : 'a while ago'}. Refresh before claiming.`}</Notice> : null}
     <Group>
-      <Row title={details ? 'Hide details' : 'Show details'} onPress={() => setDetails(!details)} chevron={!details} />
+      <Row title={details ? 'Hide details' : 'Details'} onPress={() => setDetails(!details)} chevron={!details} />
       {details ? <Row title="Confirmations" value={`${view.session.confirmations}`} /> : null}
-      {details && view.session.duration ? <Row title="Lock" value={`${(view.session.duration / 60).toFixed(1)} min`} /> : null}
+      {details && view.session.duration ? <Row title="Lock" value={lockLabel(view.session.duration)} /> : null}
       {details ? <Row title="Goes to" detail={rewardAddressOf(parseTree(view.session.commitment)!.ownerBytecode)} /> : null}
       {details && view.session.plantTxid ? <Row title="Plant transaction" detail={view.session.plantTxid} /> : null}
       {details && view.session.claimTxid ? <Row title="Claim transaction" detail={view.session.claimTxid} /> : null}

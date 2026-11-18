@@ -4,18 +4,19 @@ import { ActivityIndicator, FlatList, Image, Platform, Pressable, Switch, Text, 
 import { FocusShield, SHIELD_ROW_HEIGHT, ShieldSelectionList, type LaunchableApp } from 'focus-shield';
 import { useFocusGarden } from '../features/focus/FocusProvider';
 import { useShield } from '../features/shield/useShield';
-import { Button, color, continuous, Group, Icon, icons, Notice, Row, Screen, SwitchRow } from '../ui';
+import { Button, color, continuous, Group, Icon, icons, Notice, Row, Screen } from '../ui';
 
 export default function BlockedAppsScreen() {
   return Platform.OS === 'ios' ? <ScreenTimeBlocking /> : <AndroidBlockList />;
 }
 
 /**
- * iOS: everything about blocking in one place. Apple's Screen Time picks and shields the apps;
- * the chosen apps are drawn by iOS from opaque tokens, so Focus Garden never learns what they are.
+ * iOS: Screen Time access and the chosen apps. The on/off switch lives in Focus rules. Apple's
+ * Screen Time picks and shields the apps; the chosen apps are drawn by iOS from opaque tokens, so
+ * Focus Garden never learns what they are.
  */
 function ScreenTimeBlocking() {
-  const { garden, configure } = useFocusGarden();
+  const { garden } = useFocusGarden();
   const growing = garden.timer.status === 'growing';
   const shield = useShield();
   const status = shield.status;
@@ -26,20 +27,14 @@ function ScreenTimeBlocking() {
       ? 'This copy of Focus Garden was built without Screen Time. Install a build with app blocking to use it.'
       : 'App blocking needs an iPhone with iOS 16.4 or later.'}</Notice> : null}
     {shield.error ? <Notice tone="error">{shield.error}</Notice> : null}
-    {growing ? <Notice>You can change blocking after the current tree finishes.</Notice> : null}
+    {growing ? <Notice>You can change blocked apps after this tree finishes.</Notice> : null}
 
-    <Group footer="While a tree grows, the apps you choose open to Apple's Screen Time shield instead. Blocking ends on its own when the tree finishes, even if Focus Garden is closed.">
-      <SwitchRow title="Block apps while a tree grows" icon={icons.shield} iconTint={color.ember}
-        value={garden.blockApps} disabled={growing || !status.supported}
-        onValueChange={async (next) => { if (next && !shield.ready) await shield.continueSetup(); configure({ blockApps: next }); }} />
-    </Group>
-
-    {status.supported && !status.authorized ? <Group title="Screen Time" footer="Apple asks once. Focus Garden can't see which apps you use or which ones you choose.">
-      <Row title="Allow Screen Time access" detail="Needed to block apps" icon={icons.hourglass} iconTint={color.moss} onPress={shield.continueSetup} chevron />
+    {status.supported && !status.authorized ? <Group footer="Apple asks once. Focus Garden never sees your apps.">
+      <Row title="Allow Screen Time access" icon={icons.hourglass} iconTint={color.moss} onPress={shield.continueSetup} chevron />
     </Group> : null}
 
-    {status.supported && status.authorized ? <Group title={count ? `Blocked during focus · ${count}` : 'Blocked during focus'}
-      footer={count ? 'Pick whole categories (like Social) to cover new apps too.' : 'Choose the apps, categories or websites that pull you away.'}>
+    {status.supported && status.authorized ? <Group title={count ? `Blocked during focus · ${count}` : undefined}
+      footer={count ? 'Pick categories like Social to cover new apps too.' : 'Pick apps, categories or websites.'}>
       {count && ShieldSelectionList ? <View style={{ height: count * SHIELD_ROW_HEIGHT }}>
         <ShieldSelectionList revision={shield.revision} style={{ flex: 1 }} />
       </View> : null}

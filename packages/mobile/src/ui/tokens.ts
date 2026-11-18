@@ -39,12 +39,22 @@ export const floatingShadow: ViewStyle = { boxShadow: '0 8px 24px rgba(21, 36, 2
 /**
  * Stack header options shared by every screen. iOS keeps the system bar (Liquid Glass on iOS 26)
  * over the system grouped background that SwiftUI forms use; Android uses the app canvas.
+ *
+ * iOS 26: react-native-screens pads screen content below an opaque header by default. Screens are
+ * SwiftUI forms (or scroll views with automatic insets) that apply the bar's safe area themselves,
+ * so that padding put the first section too far below the title in sheets and modals. The content
+ * now extends under the bar, the form insets itself once, and scrolled rows pass under the glass
+ * bar with the system scroll-edge effect, as in a native sheet. (`unstable_safeAreaEdges` is not
+ * in the published option types yet; the native stack forwards it to the screen.)
  */
+const contentUnderBar = { unstable_safeAreaEdges: { top: false } } as object;
+
 export const headerOptions = Platform.OS === 'ios' ? {
   headerTintColor: color.moss,
   headerTitleStyle: { color: color.ink },
   headerShadowVisible: false,
   contentStyle: { backgroundColor: PlatformColor('systemGroupedBackground') },
+  unstable_nativeProps: contentUnderBar,
 } : {
   headerStyle: { backgroundColor: color.canvas },
   headerTintColor: color.moss,
@@ -54,7 +64,10 @@ export const headerOptions = Platform.OS === 'ios' ? {
   contentStyle: { backgroundColor: color.canvas },
 };
 
-/** Tab roots draw their own title under the status bar (see ui/Screen); the native bar stays hidden. */
+/**
+ * Tab roots: the router's bar stays hidden. On iOS the screen draws a SwiftUI navigation bar with an
+ * inline large title (see ui/Screen.ios); on Android the screen draws its title under the status bar.
+ */
 export const largeTitleOptions = {
   headerTintColor: color.moss,
   headerTitleStyle: { color: color.ink },

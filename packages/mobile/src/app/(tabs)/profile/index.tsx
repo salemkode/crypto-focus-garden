@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
@@ -22,11 +22,15 @@ const WALLET_KINDS = [{ id: 'xo', label: 'Recovery phrase' }, { id: 'foundation'
 
 const short = (address: string) => `${address.replace('bchtest:', '').slice(0, 6)}…${address.slice(-4)}`;
 
+/** Hours as a short fact: "0 h", "2.5 h", "14 h" (never "0.0 h"). */
+const hoursText = (hours: number) => hours >= 10 ? `${Math.round(hours)} h` : `${Number(hours.toFixed(1))} h`;
+
 export default function ProfileScreen() {
   const rewards = useRewards();
   const { garden } = useFocusGarden();
+  // Other screens can open the leaderboard form directly: /profile?join=1
+  const { join } = useLocalSearchParams<{ join?: string }>();
   const [displayName, setDisplayName] = useState(readDisplayName);
-  const [about, setAbout] = useState('');
   const [profile, setProfile] = useState<Awaited<ReturnType<typeof fetchProfile>> | null>(null);
   const [notice, setNotice] = useState('');
   const sessions = rewards.data.state === 'connected' ? rewards.data.sessions : [];
@@ -57,6 +61,9 @@ export default function ProfileScreen() {
 
   const isPublic = profile?.state === 'public';
   const status = isPublic ? 'Public profile' : profile?.state === 'pending' ? 'Confirming profile' : 'Private';
+  const fees = rewards.data.state === 'connected'
+    ? `Focus Garden wallet: ${rewards.data.creditSatoshis.toLocaleString()} sats for network fees.`
+    : 'The Focus Garden wallet pays network fees for your trees.';
 
   return <Screen title="Profile">
     <View className="flex-row items-center gap-4">
@@ -72,28 +79,29 @@ export default function ProfileScreen() {
     {isPublic && profile.about ? <Text className="-mt-3 px-1 text-body text-ink-2">“{profile.about}”</Text> : null}
 
     <View className="-mt-2 px-1"><Stats items={[
-      { value: focusHours(verified), label: 'verified' },
+      { value: verified ? focusHours(verified).replace('.0 h', ' h') : '0 h', label: 'verified' },
       { value: `${items.length}`, label: items.length === 1 ? 'reward' : 'rewards' },
-      { value: `${Math.round(practiced / 3600)} h`, label: 'focused in total' },
+      { value: hoursText(practiced / 3600), label: 'focused in total' },
     ]} /></View>
-
-    {!isPublic && profile?.state !== 'pending' ? <>
-      <Field label="Display name" helper="Shown publicly on Bitcoin Cash. It can't be changed later." autoCorrect={false} autoCapitalize="words" textContentType="nickname" value={displayName} onChangeText={saveName} maxLength={32} placeholder="At least 3 letters" />
-      <Field label="About you (optional)" value={about} onChangeText={setAbout} maxLength={140} placeholder="What do you focus on?" multiline />
-      <Button variant="secondary" icon={icons.globe} label="Join the leaderboard" disabled={!rewards.account || rewards.status !== 'ready' || displayName.trim().length < 3 || Boolean(rewards.pending)} onPress={() => rewards.transact({ action: 'register', name: displayName.trim(), about: about.trim() }).then(loadProfile)} />
-    </> : null}
 
     <PendingOperation />
 
-    <Group title="Wallets" footer={rewards.data.state === 'connected' ? `Helper wallet: ${rewards.data.creditSatoshis.toLocaleString()} sats for network fees.` : undefined}>
+    <Group title="Wallet" footer={fees}>
       <Row title="Your wallet" icon={icons.wallet} value={rewards.recipient ? readLinkInfo(rewards.recipient)?.walletName ?? short(rewards.recipient) : 'Not linked'} onPress={() => router.push('/link-wallet')} chevron />
-      <Row title="Helper wallet" icon={icons.key} iconTint={color.ink2} value={rewards.account ? short(rewards.account.address) : 'Set up'}
-        accessibilityLabel={rewards.account ? 'Helper wallet. Copy address' : 'Set up helper wallet'}
+      <Row title="Focus Garden wallet" icon={icons.key} iconTint={color.ink2} value={rewards.account ? short(rewards.account.address) : 'Set up'}
+        accessibilityLabel={rewards.account ? 'Focus Garden wallet. Copy address' : 'Set up Focus Garden wallet'}
         onPress={rewards.account ? () => { void Clipboard.setStringAsync(rewards.account!.address); void Haptics.selectionAsync(); } : openWallet}
         trailingIcon={rewards.account ? icons.copy : undefined} chevron={!rewards.account} />
-      {rewards.account ? <Row title="Back up helper wallet" onPress={() => router.push('/wallet-backup')} chevron /> : null}
-      <Row title={rewards.account ? 'Restore a wallet' : 'I already have a Focus Garden wallet'} onPress={() => router.push('/restore-wallet')} chevron />
+      {/* Before setup, restoring sits next to "Set up" so an existing wallet is restored rather than replaced by a new one. */}
+      {rewards.account
+        ? <Row title="Back up Focus Garden wallet" onPress={() => router.push('/wallet-backup')} chevron />
+        : <Row title="Restore a Focus Garden wallet" onPress={() => router.push('/restore-wallet')} chevron />}
     </Group>
+    {notice ? <Notice tone="error">{notice}</Notice> : rewards.notice ? <Notice>{rewards.notice}</Notice> : null}
+
+    {!isPublic && profile?.state !== 'pending'
+      ? <PublicProfile key={join ?? ''} initiallyOpen={Boolean(join)} displayName={displayName} onNameChange={saveName} onJoined={loadProfile} />
+      : null}
 
     <Group title="Focus">
       <Row title="Verified trees" icon={icons.lock} iconTint={color.bch} onPress={() => router.push('/chain')} chevron />
@@ -103,10 +111,28 @@ export default function ProfileScreen() {
     </Group>
 
     <AdvancedSection />
-    {notice || rewards.notice ? <Notice tone="error">{notice || rewards.notice}</Notice> : null}
     <Text className="text-center text-footnote text-ink-2">Focus Garden {Constants.expoConfig?.version ?? ''} on Chipnet, the Bitcoin Cash test network</Text>
   </Screen>;
 }
+
+/** One row until the user chooses to join; then the name, about and join button. */
+const PublicProfile = nativeAware(function PublicProfile({ initiallyOpen, displayName, onNameChange, onJoined }: {
+  initiallyOpen: boolean; displayName: string; onNameChange: (next: string) => void; onJoined: () => void;
+}) {
+  const rewards = useRewards();
+  const [open, setOpen] = useState(initiallyOpen);
+  const [about, setAbout] = useState('');
+  return <>
+    <Group>
+      <Row title="Public profile" icon={icons.globe} value={open ? 'Hide' : 'Not joined'} onPress={() => setOpen(!open)} chevron={!open} />
+    </Group>
+    {open ? <>
+      <Field label="Display name" helper="Shown publicly on Bitcoin Cash. It can't be changed later." autoCorrect={false} autoCapitalize="words" textContentType="nickname" value={displayName} onChangeText={onNameChange} maxLength={32} placeholder="At least 3 letters" />
+      <Field label="About you (optional)" value={about} onChangeText={setAbout} maxLength={140} placeholder="What do you focus on?" multiline />
+      <Button variant="secondary" icon={icons.globe} label="Join the leaderboard" disabled={!rewards.account || rewards.status !== 'ready' || displayName.trim().length < 3 || Boolean(rewards.pending)} onPress={() => rewards.transact({ action: 'register', name: displayName.trim(), about: about.trim() }).then(onJoined)} />
+    </> : null}
+  </>;
+});
 
 const AdvancedSection = nativeAware(function AdvancedSection() {
   const rewards = useRewards();
@@ -117,9 +143,12 @@ const AdvancedSection = nativeAware(function AdvancedSection() {
       <Row title={open ? 'Hide advanced' : 'Advanced'} onPress={() => setOpen(!open)} chevron={!open} />
     </Group>
     {open ? <>
+      {rewards.account ? <Group>
+        <Row title="Restore a Focus Garden wallet" onPress={() => router.push('/restore-wallet')} chevron />
+      </Group> : null}
       <Field label="Garden access key" helper="Stored in this phone's secure storage." secureTextEntry autoComplete="off" textContentType="none" importantForAutofill="no" value={credential} onChangeText={setCredential} autoCorrect={false} autoCapitalize="none" placeholder="64 characters" />
       <Button variant="secondary" label="Save access key" disabled={rewards.status !== 'ready' || !credential.trim()} onPress={async () => { await rewards.transact({ action: 'credential', token: credential }); setCredential(''); }} />
-      <Group title="Helper wallet type" footer="Early test versions used a single key. Both stay available and neither is overwritten.">
+      <Group title="Focus Garden wallet type" footer="Early test versions used a single key. Both stay available and neither is overwritten.">
         <Segmented options={WALLET_KINDS} value={rewards.account?.kind ?? 'xo'} disabled={rewards.pending !== null || rewards.status !== 'ready'} onChange={(kind) => rewards.selectWallet(kind).catch(() => undefined)} />
       </Group>
     </> : null}

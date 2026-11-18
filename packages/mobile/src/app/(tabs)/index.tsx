@@ -10,7 +10,7 @@ import { levelForSeconds, levelName, MAX_SESSION, SPECIES_CODE, speciesById, tag
 import { useFocusGarden } from '../../features/focus/FocusProvider';
 import { onchainSessionView } from '../../features/focus/onchain-session';
 import { growthProgress, remainingSeconds } from '../../features/focus/session';
-import { formatClock } from '../../features/focus/stats';
+import { formatClock, formatDuration } from '../../features/focus/stats';
 import { useRewards } from '../../features/rewards/RewardProvider';
 import { useShield } from '../../features/shield/useShield';
 import { growingEntity, valleyHistory } from '../../features/valley/history';
@@ -92,8 +92,9 @@ export default function FocusScreen() {
     ]);
   }
 
-  const shortName = species.name.split(' ').pop()!;
-  const stateLine = [`Grows a ${reward.name.toLowerCase()}`, shortName[0].toUpperCase() + shortName.slice(1), blocking ? `${shield.status!.selectionCount} apps blocked` : null].filter(Boolean).join(' · ');
+  const blockedLine = blocking ? `${shield.status!.selectionCount} apps blocked` : null;
+  const stateParts = [`Grows a ${reward.name.toLowerCase()}`, species.name, blockedLine].filter(Boolean);
+  const stateLine = stateParts.join(' · ');
 
   return <View className="flex-1 bg-canvas">
     <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
@@ -116,19 +117,22 @@ export default function FocusScreen() {
     {planning ? null : <SafeAreaView edges={['bottom']} pointerEvents="box-none" className="absolute bottom-0 left-0 right-0">
       <Floating onLayout={(event) => setPanel(event.nativeEvent.layout.height)} className="mx-3 mb-2 gap-4 p-4">
         {idle ? <>
-          <Pressable accessibilityRole="button" accessibilityLabel={`${Math.round(garden.duration / 60)} minutes, grows a ${reward.name}, ${tag.label}. Change session`} onPress={() => router.push('/session')}
-            className="flex-row items-center gap-3 rounded-2xl active:opacity-60">
+          {/* One summary of the next session (length, tag, what it grows); tapping it opens the session sheet. */}
+          <Pressable accessibilityRole="button" accessibilityLabel={`Next session: ${[formatDuration(garden.duration), tag.label, ...stateParts].join(', ')}`} accessibilityHint="Opens the session settings"
+            onPress={() => router.push('/session')} className="flex-row items-center gap-3 rounded-2xl active:opacity-60">
             <View className="flex-1 gap-0.5">
-              <Text style={numerals} className="text-title-1 font-semibold text-ink">{formatClock(garden.duration)}</Text>
+              <View className="flex-row items-center gap-3">
+                <Text style={numerals} className="text-title-1 font-semibold text-ink">{formatClock(garden.duration)}</Text>
+                <View className="flex-row items-center gap-1.5">
+                  <View style={{ backgroundColor: tag.color }} className="h-2.5 w-2.5 rounded-full" />
+                  <Text numberOfLines={1} className="text-subhead font-semibold text-ink-2">{tag.label}</Text>
+                </View>
+              </View>
               <Text numberOfLines={1} className="text-footnote text-ink-2">{stateLine}</Text>
             </View>
-            <View className="flex-row items-center gap-1.5 rounded-full bg-ink/5 py-1.5 pl-3 pr-2">
-              <View style={{ backgroundColor: tag.color }} className="h-2 w-2 rounded-full" />
-              <Text className="text-subhead font-semibold text-ink">{tag.label}</Text>
-              <Icon name={icons.chevron} size={11} tint={color.ink3} weight="bold" />
-            </View>
+            <Icon name={icons.chevron} size={14} tint={color.ink3} weight="semibold" />
           </Pressable>
-          {linked ? <Button label={`Plant ${species.name.split(' ').pop()!.toLowerCase()}`} icon={verified ? icons.lock : undefined} disabled={storage !== 'ready'} onPress={start}
+          {linked ? <Button label="Plant" icon={verified ? icons.lock : undefined} disabled={storage !== 'ready'} onPress={start}
             accessibilityHint={verified ? 'Locks this session on Bitcoin Cash. The grown tree is sent to your wallet.' : undefined} />
             : <Button label="Link wallet to plant" icon={icons.wallet} onPress={() => router.push('/link-wallet')} />}
         </> : null}

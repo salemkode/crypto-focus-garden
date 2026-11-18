@@ -28,17 +28,20 @@ export default function RootLayout() {
   }, []);
   return <ModelSnapshotHost><FocusProvider><RewardProvider>
     <StatusBar style="dark" />
+    {/* Sheet heights are fixed fractions: 'fitToContents' cannot measure a SwiftUI form (it scrolls
+        and has no intrinsic height). Each sheet opens at roughly its content and can grow to full. */}
     <Stack screenOptions={{ ...headerOptions, headerBackButtonDisplayMode: 'minimal' }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="welcome" options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false, animation: 'fade' }} />
       <Stack.Screen name="session" options={{ title: 'Next session', presentation: 'formSheet', sheetAllowedDetents: [0.75, 1], sheetGrabberVisible: true }} />
-      <Stack.Screen name="member" options={{ title: '', presentation: 'formSheet', sheetAllowedDetents: [0.85, 1], sheetGrabberVisible: true }} />
+      {/* The member card starts with the member's name, so the sheet has no empty title bar. */}
+      <Stack.Screen name="member" options={{ headerShown: false, presentation: 'formSheet', sheetAllowedDetents: [0.6, 1], sheetGrabberVisible: true }} />
       <Stack.Screen name="species" options={{ title: 'Tree styles', presentation: 'modal' }} />
-      <Stack.Screen name="link-wallet" options={{ title: 'Your wallet', presentation: 'formSheet', sheetAllowedDetents: [0.8, 1], sheetGrabberVisible: true }} />
+      <Stack.Screen name="link-wallet" options={{ title: 'Your wallet', presentation: 'formSheet', sheetAllowedDetents: [0.6, 1], sheetGrabberVisible: true }} />
       <Stack.Screen name="settings" options={{ title: 'Focus rules', presentation: 'modal' }} />
       <Stack.Screen name="blocked-apps" options={{ title: 'Blocked apps' }} />
       <Stack.Screen name="on-bitcoin" options={{ title: 'On Bitcoin Cash', presentation: 'modal' }} />
-      <Stack.Screen name="chain" options={{ title: 'Verified rewards', headerLargeTitle: true }} />
+      <Stack.Screen name="chain" options={{ title: 'Verified trees', headerLargeTitle: true }} />
       <Stack.Screen name="merge" options={{ title: 'Merge workshop', headerLargeTitle: true }} />
       <Stack.Screen name="wallet-backup" options={{ title: 'Back up wallet', presentation: 'modal' }} />
       <Stack.Screen name="restore-wallet" options={{ title: 'Restore wallet', presentation: 'modal' }} />

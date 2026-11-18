@@ -5,7 +5,7 @@ import * as ScreenCapture from 'expo-screen-capture';
 import * as SecureStore from 'expo-secure-store';
 import { readRecoveryPhrase } from '../features/wallet/wallet';
 import { useRewards } from '../features/rewards/RewardProvider';
-import { Button, color, continuous, Group, Icon, icons, Notice, numerals, Row, Screen } from '../ui';
+import { Button, continuous, Group, icons, Notice, numerals, Row, Screen } from '../ui';
 
 export default function WalletBackupScreen() {
   const rewards = useRewards();
@@ -47,21 +47,24 @@ export default function WalletBackupScreen() {
     } catch { setSecret(''); setState('hidden'); setNotice('Secure backup could not open on this device. Your wallet has not been changed.'); }
   }
   const what = rewards.account?.kind === 'foundation' ? 'key' : 'recovery phrase';
-  return <Screen contentClassName="pt-4">
-    <View className="items-center gap-3 px-4 pt-2">
-      <View className="h-14 w-14 items-center justify-center rounded-full bg-moss-soft"><Icon name={icons.key} size={24} tint={color.moss} /></View>
-      <Text className="text-center text-body text-ink-2">Anyone with this {what} can use your helper wallet. Write it down and keep it private. Focus Garden will never ask for it.</Text>
-    </View>
+  const words = rewards.account?.kind === 'foundation' ? [] : secret.trim().split(/\s+/).filter(Boolean);
+  return <Screen>
+    <Notice tone="warning">{`Anyone with this ${what} can use your Focus Garden wallet. Keep it private; Focus Garden will never ask for it.`}</Notice>
     {state === 'visible' ? <View className="gap-3">
-      <View style={continuous} className="rounded-[20px] bg-surface p-5">
-        <Text selectable={false} style={numerals} className="text-title-3 font-medium leading-8 text-ink" accessibilityLabel="Sensitive wallet backup">{secret}</Text>
+      <View style={continuous} className="rounded-[20px] bg-surface p-4" accessible accessibilityLabel="Sensitive wallet backup">
+        {words.length ? <View className="flex-row flex-wrap">
+          {words.map((word, index) => <View key={index} className="w-1/2 flex-row items-baseline gap-2 py-1.5 pr-2">
+            <Text selectable={false} style={numerals} className="w-6 text-right text-footnote text-ink-3">{index + 1}</Text>
+            <Text selectable={false} className="flex-1 text-headline text-ink">{word}</Text>
+          </View>)}
+        </View> : <Text selectable={false} style={numerals} className="text-title-3 font-medium leading-8 text-ink">{secret}</Text>}
       </View>
       <Text className="px-4 text-footnote text-ink-2">Hides after one minute or when you leave the app. Do not take a photo of it.</Text>
-      <Button variant="secondary" label="Hide backup" onPress={() => { setSecret(''); setState('hidden'); }} />
-    </View> : <Button label="Unlock and show backup" icon={icons.lock} busy={state === 'unlocking'} disabled={!rewards.account} onPress={reveal} />}
+      <Button variant="secondary" label={`Hide ${what}`} onPress={() => { setSecret(''); setState('hidden'); }} />
+    </View> : <Button label={`Show ${what}`} icon={icons.lock} busy={state === 'unlocking'} disabled={!rewards.account} onPress={reveal} />}
     {notice ? <Notice tone="error">{notice}</Notice> : null}
-    {rewards.account ? <Group title="Helper wallet address">
-      <Row title={rewards.account.address} accessibilityLabel="Helper wallet address" />
+    {rewards.account ? <Group title="Focus Garden wallet address">
+      <Row title={rewards.account.address} accessibilityLabel="Focus Garden wallet address" />
     </Group> : null}
   </Screen>;
 }

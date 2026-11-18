@@ -30,7 +30,8 @@ const MAX_PIXEL_RATIO = 2;
 /** Frames slower than this count against the 1% low (90 FPS). */
 const SLOW_FRAME_MS = 1000 / 90;
 /** The on-screen FPS overlay: debug builds, or release builds bundled with EXPO_PUBLIC_VALLEY_STATS=1 (device measurements). */
-const SHOW_STATS = __DEV__ || process.env.EXPO_PUBLIC_VALLEY_STATS === '1';
+// Opt-in only (EXPO_PUBLIC_VALLEY_STATS=1): the overlay covered the wallet button in every dev build.
+const SHOW_STATS = process.env.EXPO_PUBLIC_VALLEY_STATS === '1';
 
 /** Rendered pixels per point at most: dynamic resolution scales the view between 60% and 100% of this. */
 const RESOLUTION_CAP = Math.min(1, MAX_PIXEL_RATIO / PixelRatio.get());
