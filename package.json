@@ -9,8 +9,6 @@
 	"scripts": {
 		"compile": "bun run --filter='*' compile",
 		"dev": "bun run dev:web",
-		"bump": "node bump_version.cjs",
-		"publish": "bun run --filter='*' publish:public",
 		"build": "bun run --filter='*' compile && cd packages/dapp && bun run build",
 		"test": "bun run test:contracts && bun run test:mobile && bun run test:service",
 		"clean": "rm -rf packages/**/dist",

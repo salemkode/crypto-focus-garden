@@ -107,7 +107,7 @@ The voxel models for the valley tiles, biomes, village and animals extend `packa
 - **Unique NFTs:** a merged NFT's seed is the hash of its ingredients (its lineage). That seed sets its colour accents, details (flags, gardens, lanterns, sail angle, towers) and a generated name such as "Ember Mill of Dawnhollow". The style (species) carries over from the ingredients.
 - **Score:** each NFT keeps the sum of its ingredients' focus units, so merging never changes a leaderboard score.
 - **Code:** `packages/garden/src/ladder.ts` (models, rules, names), tested in `packages/garden/test/ladder.test.ts`.
-- **Prototypes:** `packages/garden/prototype/ladder.html` and `packages/garden/prototype/valley.html`.
+- **Prototypes:** `packages/garden/prototype/ladder.html` and `packages/garden/prototype/valley.html` (generated, not committed: run `bun packages/garden/prototype/build.ts` and `bun packages/garden/prototype/build-ladder.ts`).
 - **Contract impact (next):** a v6 commitment with level 1–10, style, unit sum and lineage stamp. Plant caps at 7 units and levels 1–3. Merge burns N items of one level into one of the next. Because NFTs now live in the user's wallet, the user's wallet signs merges (WalletConnect) and the app's helper wallet pays the fee.
 
 ## 7. A real valley, computed from numbers, with life (user direction, 16 November 2026)
