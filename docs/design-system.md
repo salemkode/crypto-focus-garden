@@ -270,6 +270,31 @@ the thumb's position and shadow.
 Resizable sheets show the grabber; page sheets do not (iOS 26 convention). The welcome flow stays a
 full-screen modal without a swipe to dismiss.
 
+## Fifth pass (19 November 2026): Android, web and accessibility
+
+Found by walking every screen on an Android 16 emulator and in a phone-sized browser.
+
+- **Touch targets are real points.** NativeWind's rem is 14 px on native, so `h-11` was 38.5 pt, not
+  44. `tailwind.config.cjs` pins the target sizes (`9` = 36 pt with a 4 pt slop above and below,
+  `11` = 44, `12` = 48, `14` = 56) for `h`, `min-h` and `w`. Padding and gaps keep the rem scale.
+  Use these classes for anything tappable; don't size a target with other spacing steps.
+- **Android sheets match iOS.** Form sheets get Material 3's 28 dp top corners (`sheetOptions`),
+  and `Screen` with `sheet` draws the drag handle and the sheet's title, which Android's native
+  stack does not. iOS and the web ignore it.
+- **The keyboard never covers the field.** Android draws edge to edge, so the window no longer
+  shrinks for the keyboard: screens with a field pad for it on both platforms, and the onboarding
+  footer steps aside while typing.
+- **Text that must fit gets the width.** Android measures semibold text slightly narrower than it
+  draws; a label between two controls takes `flex-1` and one line (the Stats period title lost
+  "week").
+- **Copy is true per platform.** "Screen Time" only on iOS; Android's guard is "blocked while your
+  tree grows".
+- **Web.** The web gets Android's bottom navigation (`(tabs)/_layout.web.tsx`); NativeTabs floats a
+  bar over the screen titles there. The native tab bar is unchanged. Images are sized with `style`,
+  because `className` sizes don't reach React Native's `Image` on the web. A browser keeps only the
+  public linked address; wallet keys stay in the iPhone and Android apps (`web-shims/secure-store.ts`).
+- **The web valley is paced like the native one**: 30 fps at rest, full rate only while moving.
+
 ## Motion
 
 Motivated only: spring on sheet and card entry, a short fade for state changes, haptics on

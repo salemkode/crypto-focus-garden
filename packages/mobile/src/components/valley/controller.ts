@@ -11,6 +11,7 @@ import { ValleyScene, type Hit, type SceneEvent } from '@focus-garden/garden/sce
 import { seasonFor } from '@focus-garden/garden/season';
 import type { ValleyEntity, ValleyEvent } from '@focus-garden/garden/valley';
 import type { FromValley, ToValley } from './protocol';
+import { createPacer, shouldStep } from './filament/pacing';
 
 const signature = (events: readonly ValleyEvent[]) => events.map((e) => (e.type === 'plant' ? e.entity.id : `${e.result.id}<${e.ingredients.join(',')}`)).join('|');
 const CARD_WIDTH = 248;
@@ -204,9 +205,13 @@ export function startValley(canvas: HTMLCanvasElement, send: (message: FromValle
   // ------------------------------------------------------------------ frame loop
 
   let frame = 0, lastFrame = performance.now(), statsAt = performance.now(), frames = 0, spent = 0;
+  // The same pacing as the native valley (filament/pacing.ts): full rate only while something moves
+  // on purpose, 30 fps otherwise. A browser tab drawing 120 Hz all session heats a phone or laptop too.
+  const pacer = createPacer();
   const loop = (now: number) => {
     frame = requestAnimationFrame(loop);
     if (paused || !valley || !renderer) return;
+    if (!shouldStep(pacer, now, view.moving || valley.busy)) return;
     const started = performance.now();
     const dt = Math.min(0.05, (now - lastFrame) / 1000); lastFrame = now;
     view.limits.bounds = valley.radius;

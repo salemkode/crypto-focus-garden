@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { RefreshControl, ScrollView, Text, View, type ScrollViewProps } from 'react-native';
+import { Platform, RefreshControl, ScrollView, Text, View, type ScrollViewProps } from 'react-native';
 import { color } from './tokens';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -17,7 +17,8 @@ export type ScreenProps = Omit<ScrollViewProps, 'refreshControl'> & {
   refreshing?: boolean;
   /**
    * A form sheet. Android's native stack draws neither a header nor a grabber on sheets, so the
-   * screen draws both (with the sheet's title, when it has one). iOS draws its own and ignores this.
+   * screen draws both (with the sheet's title, when it has one). iOS draws its own, and the web
+   * shows sheets as pages with the stack's header, so both ignore this.
    */
   sheet?: { title?: string };
 };
@@ -27,7 +28,7 @@ export function Screen({ children, title, accessory, contentClassName = '', onRe
   // Headerless Android tabs need their own inset; pushed screens already have a native header.
   // iOS uses Screen.ios.tsx, where the native Form handles its safe area.
   return <View className="flex-1 bg-canvas" style={title ? { paddingTop: insets.top } : undefined}>
-    {sheet ? <View className="px-5 pb-1">
+    {sheet && Platform.OS === 'android' ? <View className="px-5 pb-1">
       <View className="h-6 items-center justify-center" importantForAccessibility="no-hide-descendants">
         <View style={{ backgroundColor: color.ink3 }} className="h-1 w-8 rounded-full opacity-40" />
       </View>

@@ -16,6 +16,7 @@ function withWebLibauth(config) {
       resolveRequest(context, moduleName, platform) {
         if (platform === 'web' && moduleName === 'libauth-native/polyfills') return { type: 'sourceFile', filePath: path.join(__dirname, 'web-shims', 'empty.ts') };
         if (platform === 'web' && moduleName === 'expo-sqlite/kv-store') return { type: 'sourceFile', filePath: path.join(__dirname, 'web-shims', 'kv-store.ts') };
+        if (platform === 'web' && moduleName === 'expo-secure-store') return { type: 'sourceFile', filePath: path.join(__dirname, 'web-shims', 'secure-store.ts') };
         const resolution = (upstream ?? context.resolveRequest)(context, moduleName, platform);
         if (platform === 'web' && context.originModulePath !== WEB_CRYPTO_SHIM && resolution?.type === 'sourceFile' && resolution.filePath.endsWith(DEFAULT_CRYPTO)) {
           return { type: 'sourceFile', filePath: WEB_CRYPTO_SHIM };

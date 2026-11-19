@@ -58,7 +58,7 @@ export function Row({ title, detail, value, icon, image, iconTint = color.moss, 
   accessibilityLabel?: string;
 }) {
   const body = <>
-    {image ? <Image source={image} style={{ borderCurve: 'continuous' }} className="h-8 w-8 rounded-[9px]" /> : icon ? <Lead icon={icon} tint={iconTint} /> : null}
+    {image ? <Image source={image} style={{ width: 32, height: 32, borderRadius: 9, borderCurve: 'continuous' }} /> : icon ? <Lead icon={icon} tint={iconTint} /> : null}
     <Titles title={title} detail={detail} destructive={destructive} />
     {value ? <Text numberOfLines={1} className="max-w-[55%] text-body text-ink-2">{value}</Text> : null}
     {accessory}
