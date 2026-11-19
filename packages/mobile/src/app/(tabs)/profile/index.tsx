@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
-import { AccessibilityInfo, Text, View } from 'react-native';
+import { AccessibilityInfo, Alert, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
@@ -142,6 +142,15 @@ const PublicProfile = nativeAware(function PublicProfile({ initiallyOpen, displa
   const rewards = useRewards();
   const [open, setOpen] = useState(initiallyOpen);
   const [about, setAbout] = useState('');
+  // Joining writes a public, permanent name on Bitcoin Cash and spends test coins: one confirm, as
+  // for plant, send, merge and tip, saying exactly what happens and what it costs.
+  function confirmJoin() {
+    const name = displayName.trim();
+    Alert.alert(`Join as ${name}?`, `Your name is written on Bitcoin Cash for everyone to see, and can't be changed later.\n\nCost: a 2,000-sat network fee, plus 1,000 sats kept in your profile card in your Focus Garden wallet, in test coins with no cash value.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Join', onPress: () => { void rewards.transact({ action: 'register', name, about: about.trim() }).then(onJoined); } },
+    ]);
+  }
   return <>
     <Group>
       <Row title="Public profile" icon={icons.globe} value={open ? 'Hide' : 'Not joined'} onPress={() => setOpen(!open)} chevron={!open} />
@@ -149,7 +158,7 @@ const PublicProfile = nativeAware(function PublicProfile({ initiallyOpen, displa
     {open ? <>
       <Field label="Display name" helper="Shown publicly on Bitcoin Cash. It can't be changed later." autoCorrect={false} autoCapitalize="words" textContentType="nickname" value={displayName} onChangeText={onNameChange} maxLength={32} placeholder="At least 3 letters" />
       <Field label="About you (optional)" value={about} onChangeText={setAbout} maxLength={140} placeholder="What do you focus on?" multiline />
-      <Button variant="secondary" icon={icons.globe} label="Join the leaderboard" disabled={!rewards.account || rewards.status !== 'ready' || displayName.trim().length < 3 || Boolean(rewards.pending)} onPress={() => rewards.transact({ action: 'register', name: displayName.trim(), about: about.trim() }).then(onJoined)} />
+      <Button variant="secondary" icon={icons.globe} label="Join the leaderboard" disabled={!rewards.account || rewards.status !== 'ready' || displayName.trim().length < 3 || Boolean(rewards.pending)} onPress={confirmJoin} />
     </> : null}
   </>;
 });
