@@ -49,24 +49,19 @@ const ua = navigator.userAgent;
 const mine: Platform = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? "ios" : /Android/.test(ua) ? "android" : "web";
 // Available platforms first, the visitor's own platform leading; the first available one is primary.
 const rank = (key: Platform) => (DOWNLOADS[key] ? 0 : 2) + (key === mine ? 0 : 1);
-const ordered = [...PLATFORMS].sort((a, b) => rank(a.key) - rank(b.key));
+const ordered = [...PLATFORMS].filter((platform) => DOWNLOADS[platform.key]).sort((a, b) => rank(a.key) - rank(b.key));
 const primaryKey = ordered.find((platform) => DOWNLOADS[platform.key])?.key;
 for (const group of $$("[data-downloads]")) {
 	group.innerHTML = "";
 	for (const platform of ordered) {
 		const url = DOWNLOADS[platform.key];
 		const primary = platform.key === primaryKey;
-		const link = document.createElement(url ? "a" : "span");
+		const link = document.createElement("a");
 		link.className = `button ${primary ? "button-primary" : "button-secondary"}`;
-		link.innerHTML = `<span class="icon-inline">${platform.icon}</span>${platform.label}${url ? "" : " <small>Coming soon</small>"}`;
-		if (url) {
-			(link as HTMLAnchorElement).href = url;
-			if (/^https?:/.test(url)) { (link as HTMLAnchorElement).target = "_blank"; (link as HTMLAnchorElement).rel = "noopener"; }
-			link.setAttribute("aria-label", `Get Focus Garden for ${platform.label}`);
-		} else {
-			link.setAttribute("aria-disabled", "true");
-			link.setAttribute("aria-label", `Focus Garden for ${platform.label} is coming soon`);
-		}
+		link.innerHTML = `<span class="icon-inline">${platform.icon}</span>${platform.label}`;
+		link.href = url;
+		if (/^https?:/.test(url)) { link.target = "_blank"; link.rel = "noopener"; }
+		link.setAttribute("aria-label", `Get Focus Garden for ${platform.label}`);
 		group.append(link);
 	}
 }
@@ -362,7 +357,9 @@ if (info.deployed && info.forest && info.directory) {
 			</dl></article>`;
 		}).join("");
 } else {
-	contracts.innerHTML = `<div class="pending"><span class="network-pill">Chipnet test network</span><b>Contracts are being deployed.</b><p>Their addresses will appear here, so anyone can check every tree against the chain.</p></div>`;
+	// Not deployed yet: show only what is live. The cards and the leaderboard appear by themselves
+	// once the deployment record says the contracts are on chain.
+	contracts.hidden = true;
 }
 contracts.addEventListener("click", async (event) => {
 	const button = (event.target as Element).closest<HTMLButtonElement>("[data-copy]");
@@ -382,4 +379,8 @@ contracts.addEventListener("click", async (event) => {
 const board = info.deployed && info.forest && info.directory
 	? { network: info.network === "mainnet" ? "mainnet" : "chipnet", forest: info.forest, directory: info.directory } satisfies LeaderboardDeployment
 	: null;
-mountLeaderboard($("[data-leaderboard]"), board, EXPLORER.address);
+if (board) mountLeaderboard($("[data-leaderboard]"), board, EXPLORER.address);
+else {
+	$("#leaders").hidden = true;
+	$$<HTMLAnchorElement>('a[href="#leaders"]').forEach((link) => link.remove());
+}
