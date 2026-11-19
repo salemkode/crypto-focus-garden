@@ -5,7 +5,7 @@ tree withers. Verified sessions are locked on Bitcoin Cash, and the grown tree i
 wallet as a collectible. Longer focus grows bigger trees (sprout, tree, big tree, house), and
 smaller ones merge into bigger ones.
 
-> [Try the hosted browser preview](https://focusgarden.salemkode.com/blaze/). The Focus Forest and Focus Directory genesis transactions confirmed in Mainnet block 977985. The current app wallet and transaction service are still configured for Chipnet.
+> [Try the hosted browser preview](https://focusgarden.salemkode.com/blaze/) to start a focus session and grow a local tree without a wallet. The Focus Forest and Focus Directory genesis transactions confirmed in Mainnet block 977985. The current app wallet and transaction service are still configured for Chipnet.
 
 ## What's in the repository
 
@@ -40,6 +40,9 @@ bun run check             # types, lint and all tests
 
 Expo Go is not supported; the app needs a development build because it ships native modules
 (crypto, app blocking and the Filament 3D renderer).
+
+For the hosted browser preview, export from `packages/mobile` with
+`EXPO_PUBLIC_GARDEN_WEB_PREVIEW=1 bunx expo export --platform web`. Preview sessions use the browser's local garden.
 
 ## Documentation
 

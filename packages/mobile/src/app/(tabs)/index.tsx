@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { router } from 'expo-router';
-import { AccessibilityInfo, Alert, Pressable, Text, View } from 'react-native';
+import { AccessibilityInfo, Alert, Platform, Pressable, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,6 +34,8 @@ export default function FocusScreen() {
   const reward = { name: levelName(levelForSeconds(length)) };
   const size = reward.name.toLowerCase();
   const linked = Boolean(rewards.recipient);
+  const localPreview = Platform.OS === 'web' && process.env.EXPO_PUBLIC_GARDEN_WEB_PREVIEW === '1' && !linked;
+  const canPlant = linked || localPreview;
   const canVerify = Boolean(rewards.account && linked && rewards.data.state === 'connected');
   // An unresolved wallet operation blocks a new plant, so the session would not be verified.
   const verified = garden.verify && canVerify && !rewards.pending;
@@ -41,6 +43,7 @@ export default function FocusScreen() {
   const [onChain, setOnChain] = useState<'sending' | 'sent' | 'failed' | null>(null);
   const [panel, setPanel] = useState(260);
   const [planning, setPlanning] = useState(false);
+  const [confirmingGiveUp, setConfirmingGiveUp] = useState(false);
   const insets = useSafeAreaInsets();
   const { merges, state: mergeStorage, record } = useStoredMerges();
 
@@ -93,8 +96,8 @@ export default function FocusScreen() {
   }, [timer.status, storage]);
 
   function start() {
-    // Every tree belongs to a wallet: there is no planting before one is linked.
-    if (!linked) return;
+    if (!canPlant) return;
+    setConfirmingGiveUp(false);
     plant();
     const units = Math.floor(garden.duration / 512);
     // The Plant tap approves the whole verified session: lock it now, and send the grown tree to
@@ -109,6 +112,10 @@ export default function FocusScreen() {
   }
 
   function confirmGiveUp() {
+    if (Platform.OS === 'web') {
+      setConfirmingGiveUp(true);
+      return;
+    }
     Alert.alert('Give up this tree?', 'It withers in your valley.', [
       { text: 'Keep going', style: 'cancel' },
       { text: 'Give up', style: 'destructive', onPress: giveUp },
@@ -159,7 +166,8 @@ export default function FocusScreen() {
             </View>
             <Icon name={icons.chevron} size={14} tint={color.ink3} weight="semibold" />
           </Pressable>
-          {linked ? <Button label="Plant" icon={verified ? icons.lock : undefined} disabled={storage !== 'ready'} onPress={start}
+          {localPreview ? <Text className="text-footnote text-ink-2">Your tree stays in this browser. No wallet needed.</Text> : null}
+          {canPlant ? <Button label={localPreview ? 'Try a focus session' : 'Plant'} icon={verified ? icons.lock : undefined} disabled={storage !== 'ready'} onPress={start}
             accessibilityHint={verified ? 'Locks this session on Bitcoin Cash. The grown tree is sent to your wallet.' : undefined} />
             : <Button label="Link your wallet to plant" icon={icons.wallet} onPress={() => router.push('/link-wallet')} />}
         </> : null}
@@ -175,7 +183,14 @@ export default function FocusScreen() {
             </View>
           </View>
           {onChain === 'failed' ? <Notice tone="error">{`Not verified on Bitcoin Cash. Your ${size} still grows here.`}</Notice> : null}
-          <Button variant="destructive" size="medium" label="Give up" onPress={confirmGiveUp} />
+          {confirmingGiveUp ? <View className="gap-2">
+            <Text className="text-footnote text-ink-2">Give up this tree? It withers in your valley.</Text>
+            <Button size="medium" label="Keep going" onPress={() => setConfirmingGiveUp(false)} />
+            <Button variant="destructive" size="medium" label="Give up this tree" onPress={() => {
+              setConfirmingGiveUp(false);
+              giveUp();
+            }} />
+          </View> : <Button variant="destructive" size="medium" label="Give up" onPress={confirmGiveUp} />}
         </Animated.View> : null}
 
         {timer.status === 'grown' || timer.status === 'withered' ? <Animated.View entering={FadeIn} className="gap-4">
