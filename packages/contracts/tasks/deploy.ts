@@ -132,11 +132,7 @@ async function deploy(provider: ElectrumNetworkProvider) {
 
 function printResult(record: Record) {
 	if (record.steps.some((step) => step.state !== "sent")) return;
-	console.log(`\nDeployed on ${record.network}. Every app build must use these values (packages/mobile/.env):\n`);
-	console.log(`EXPO_PUBLIC_GARDEN_CATEGORY=${record.forest.category}`);
-	console.log(`EXPO_PUBLIC_GARDEN_CONTRACT_BYTECODE=${record.forest.lockingBytecode}`);
-	console.log(`EXPO_PUBLIC_GARDEN_DIRECTORY_CATEGORY=${record.directory.category}`);
-	console.log(`EXPO_PUBLIC_GARDEN_DIRECTORY_BYTECODE=${record.directory.lockingBytecode}`);
+	console.log(`\nDeployed on ${record.network}. App builds read this record (packages/contracts/deployments/${record.network}.json); commit it.\n`);
 	console.log(`\nFocus Forest contract:    ${record.forest.address}\nFocus Directory contract: ${record.directory.address}`);
 	if (record.creator) console.log(`Creator NFTs:             ${record.creator.count} trees minted to ${record.creator.address} (genesis ${record.steps[1].txid})`);
 	console.log("");

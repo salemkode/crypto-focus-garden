@@ -14,7 +14,7 @@ function planted(tier: number, species: number, units: number, at: number) {
 }
 
 /**
- * Development-only sample forest for previewing v5 before any real Chipnet tree exists.
+ * Development-only sample forest for previewing v5 before any real tree exists.
  * Never used in release builds and always labelled in the UI.
  */
 export function sampleRewardSessions(now: number): Session[] {
@@ -39,7 +39,7 @@ export function sampleRewardSessions(now: number): Session[] {
   return sessions;
 }
 
-/** Development-only leaderboard so the Leaders tab can be previewed before Chipnet data exists. */
+/** Development-only leaderboard so the Leaders tab can be previewed before chain data exists. */
 export function sampleLeaderboard() {
   const people = [
     ['Salem', 'Deep work every morning before the city wakes up.', 64, 19, 4],

@@ -1,5 +1,7 @@
 # Native app and hybrid-wallet rules
 
+> **Historical.** The garden service (`packages/service`) and its BCHN node described below were removed. The app now builds, signs and broadcasts every transaction itself and reads the chain through public Electrum servers; see `packages/protocol/src/build.ts`, `chain.ts` and `garden.ts`.
+
 Confirmed by the user on 2026-11-15: **React Native app; on-device internal wallet; backend funds limited transaction credit; earned results go to the user's external wallet.** Ionic/Capacitor and a hosted web page are not the product direction.
 
 ## Responsibilities
@@ -36,7 +38,7 @@ Changing to v3 changes the contract address. v1/v2 UTXOs do not migrate automati
 
 The backend must execute account and global reservations atomically in a durable ledger, keyed by authenticated account and idempotency key, before preparing a transfer. A device-generated address alone is not an anti-abuse identity. Release reserves must not be consumed by new planting sessions.
 
-Ambiguous broadcasts remain pending. Reconcile the recorded txid against the network; never generate and broadcast another grant automatically. Backend-supplied financial data is validated at the native boundary. The native signer must independently validate network, source outputs, allowed destinations, category/commitment, change, amounts, and fees before signing; never sign a bare digest or trust a requested transaction's title. The service and native signing integrations are now implemented in code; deployment and live financed validation remain outstanding. See [funding-service.md](funding-service.md).
+Ambiguous broadcasts remain pending. Reconcile the recorded txid against the network; never generate and broadcast another grant automatically. Backend-supplied financial data is validated at the native boundary. The native signer must independently validate network, source outputs, allowed destinations, category/commitment, change, amounts, and fees before signing; never sign a bare digest or trust a requested transaction's title. The service and native signing integrations are now implemented in code; deployment and live financed validation remain outstanding.
 
 ## Delivery status
 
@@ -48,10 +50,10 @@ Before mainnet: replace development fixed fees with fee estimation, determine re
 
 ## Implementation update — 15 November 2026
 
-`packages/service` and `packages/protocol` provide the executable bounded-credit and transaction path. The consolidated Expo client signs with the existing foundation or XO vault and retains the original shared island. See [funding-service.md](funding-service.md) for configuration, persisted idempotency, BCH 2026 VM checks, MTP maturity, explicit recovery, and remaining release gates. The paragraphs above retain the original rules; their earlier “implemented” list is not a complete list of the new code. No financial transaction or live service deployment was performed.
+`packages/service` and `packages/protocol` provide the executable bounded-credit and transaction path. The consolidated Expo client signs with the existing foundation or XO vault and retains the original shared island. The removed service doc covered configuration, persisted idempotency, BCH 2026 VM checks, MTP maturity, explicit recovery, and remaining release gates. The paragraphs above retain the original rules; their earlier “implemented” list is not a complete list of the new code. No financial transaction or live service deployment was performed.
 
 ## Functional Chipnet delivery update
 
 The public-launch checkpoint was superseded by complete functional Chipnet delivery as the current priority. `testnetFunctionalReady=false` and `publicReleaseReady=false`. Current code adds own-node genesis/fork/confirmation authority, split bounded test-write capabilities, reorg-safe receipt/holding checks, persistent account/treasury controls, backups, dedicated test setup, and native on-chain session/offline/server-record recovery and protected wallet backups. The original on-device key, fixed external destination, original island and separate raw/XO vault requirements remain unchanged.
 
-See [current service model](funding-service.md), [actual acceptance procedure](chipnet-acceptance.md) and the root release/work status. The earlier delivery paragraphs above are historical code checkpoints. Bounded tests with newly dedicated Chipnet identities/coins are now authorized through normal approvals, but no actual financial transaction has been executed here. The validating shared node capability and usable Android/iOS targets remain unavailable; Electrum observations and successful builds do not satisfy those gates.
+See the root release/work status. The earlier delivery paragraphs above are historical code checkpoints. Bounded tests with newly dedicated Chipnet identities/coins are now authorized through normal approvals, but no actual financial transaction has been executed here. The validating shared node capability and usable Android/iOS targets remain unavailable; Electrum observations and successful builds do not satisfy those gates.

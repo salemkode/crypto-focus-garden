@@ -1,5 +1,7 @@
 # Focus Garden + Expo consolidation
 
+> **Historical.** The garden service (`packages/service`) and its BCHN node described below were removed. The app now builds, signs and broadcasts every transaction itself and reads the chain through public Electrum servers; see `packages/protocol/src/build.ts`, `chain.ts` and `garden.ts`.
+
 Snapshot: 15 November 2026. Branch: `feat/unify-focus-garden-expo`. The user explicitly requested one software project; no commit, push, PR merge, deployment or financial transaction was performed.
 
 ## Canonical architecture
@@ -82,4 +84,4 @@ Validate startup/rendering and wallet restoration on an owned development device
 
 ## Subsequent funding/signing work
 
-The consolidation results above are its checkpoint, not verification of later edits. The subsequent service/native-v3 work is owned by the main implementation task and documented in [funding-service.md](funding-service.md). Code for authenticated credit, preparation, local full-transaction validation/signing and recovery now exists. Deployment, financial acceptance and owned-device QA remain unperformed.
+The consolidation results above are its checkpoint, not verification of later edits. The subsequent service/native-v3 work is owned by the main implementation task and documented in the (since removed) service doc. Code for authenticated credit, preparation, local full-transaction validation/signing and recovery now exists. Deployment, financial acceptance and owned-device QA remain unperformed.

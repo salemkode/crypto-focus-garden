@@ -8,6 +8,7 @@ import { readLinkInfo, useWalletLink } from '../features/wallet-link/useWalletLi
 import { METHOD_NAME, WALLET_APPS, walletConnectAvailable } from '../features/wallet-link/wallets';
 import { Button, color, continuous, Field, Group, icons, nativeAware, Notice, Row } from '../ui';
 import { RewardNotice } from './PendingOperation';
+import { PREFIX } from '../services/network';
 
 const short = (address: string) => `${address.slice(0, 14)}…${address.slice(-6)}`;
 
@@ -88,7 +89,7 @@ export const WalletLink = nativeAware(function WalletLink({ onLinked }: { onLink
 
       {manual ? <>
         {/* Return links the address: the keyboard can cover the button below on a short screen. */}
-        <Field label="Chipnet address" value={draft} onChangeText={setDraft} autoCorrect={false} autoCapitalize="none" placeholder="bchtest:"
+        <Field label="Wallet address" value={draft} onChangeText={setDraft} autoCorrect={false} autoCapitalize="none" placeholder={`${PREFIX}:`}
           returnKeyType="go" onSubmitEditing={() => { if (draft.trim() && ready && !saving) void saveManual(); }} />
         <Button variant="secondary" label="Link this address" busy={saving} disabled={!draft.trim() || !ready} onPress={() => void saveManual()} />
       </> : null}

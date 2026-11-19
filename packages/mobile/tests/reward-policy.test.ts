@@ -14,15 +14,15 @@ describe('merged local sessions and v5 rewards', () => {
     expect(claimedSessions([]).length).toBe(0);
   });
   test('only claimed rewards are counted, never locked, confirming or claimable', () => {
-    const data = gardenSchema.parse({ network: 'chipnet', creditSatoshis: 0, sessions: ['confirming', 'locked', 'claimable', 'claimed'].map((state, index) => ({ ...reward, commitment: `05${String(index + 1).padStart(2, '0').repeat(20)}${'aa'.repeat(12)}${'01'.repeat(4)}0321`, state })) });
+    const data = gardenSchema.parse({ network: 'mainnet', balanceSatoshis: 0, sessions: ['confirming', 'locked', 'claimable', 'claimed'].map((state, index) => ({ ...reward, commitment: `05${String(index + 1).padStart(2, '0').repeat(20)}${'aa'.repeat(12)}${'01'.repeat(4)}0321`, state })) });
     expect(claimedSessions(data.sessions).length).toBe(1);
   });
   test('rejects duplicate rewards, legacy commitments, early estimates and wrong network', () => {
-    const data = { network: 'chipnet', creditSatoshis: 0, sessions: [reward] };
+    const data = { network: 'mainnet', balanceSatoshis: 0, sessions: [reward] };
     expect(gardenSchema.safeParse(data).success).toBe(true);
     expect(gardenSchema.safeParse({ ...data, sessions: [reward, reward] }).success).toBe(false);
     expect(gardenSchema.safeParse({ ...data, sessions: [{ ...reward, commitment: `01${'00'.repeat(29)}03` }] }).success).toBe(false);
     expect(gardenSchema.safeParse({ ...data, sessions: [{ ...reward, releaseAt: 2000 }] }).success).toBe(false);
-    expect(gardenSchema.safeParse({ ...data, network: 'mainnet' }).success).toBe(false);
+    expect(gardenSchema.safeParse({ ...data, network: 'testnet4' }).success).toBe(false);
   });
 });

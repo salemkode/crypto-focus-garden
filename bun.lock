@@ -189,16 +189,6 @@
       "version": "0.1.0",
       "dependencies": {
         "@bitauth/libauth": "3.1.0-next.8",
-        "effect": "^4.1.2",
-        "zod": "^4.6.7",
-      },
-    },
-    "packages/service": {
-      "name": "@focus-garden/service",
-      "version": "0.1.0",
-      "dependencies": {
-        "@bitauth/libauth": "3.1.0-next.8",
-        "@focus-garden/protocol": "workspace:*",
         "cashscript": "0.13.0-next.1",
         "effect": "^4.1.2",
         "zod": "^4.6.7",
@@ -603,8 +593,6 @@
     "@focus-garden/mobile": ["@focus-garden/mobile@workspace:packages/mobile"],
 
     "@focus-garden/protocol": ["@focus-garden/protocol@workspace:packages/protocol"],
-
-    "@focus-garden/service": ["@focus-garden/service@workspace:packages/service"],
 
     "@gar/promisify": ["@gar/promisify@1.1.3", "", {}, "sha512-k2Ty1JcVojjJFwrg/ThKi2ujJ7XNLYaFGNB/bWT9wGR+oSMJHMa5w+CUq6p/pVrKeNNgA7pCqEcjSnHVoqJQFw=="],
 
@@ -3126,9 +3114,7 @@
 
     "@focus-garden/protocol/@bitauth/libauth": ["@bitauth/libauth@3.1.0-next.8", "", {}, "sha512-Pm+Ju+YP3JeBLLTiVrBnia2wwE4G17r4XqpvPRMcklElJTe8J6x3JgKRg1by0Xm3ZY6UFxACkEAoSA+x419/zA=="],
 
-    "@focus-garden/service/@bitauth/libauth": ["@bitauth/libauth@3.1.0-next.8", "", {}, "sha512-Pm+Ju+YP3JeBLLTiVrBnia2wwE4G17r4XqpvPRMcklElJTe8J6x3JgKRg1by0Xm3ZY6UFxACkEAoSA+x419/zA=="],
-
-    "@focus-garden/service/typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
+    "@focus-garden/protocol/typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
 
     "@isaacs/cliui/string-width": ["string-width@5.1.2", "", { "dependencies": { "eastasianwidth": "^0.2.0", "emoji-regex": "^9.2.2", "strip-ansi": "^7.0.1" } }, "sha512-HnLOCR3vjcY8beoNLtcjZ5/nxn2afmME6lhrDrebokqMap+XbeW8n9TXpPDOqdGK5qcI3oT0GKTW6wC7EMiVqA=="],
 

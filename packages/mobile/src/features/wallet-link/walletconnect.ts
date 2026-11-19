@@ -2,7 +2,8 @@
 import '@walletconnect/react-native-compat';
 import NetInfo from '@react-native-community/netinfo';
 import { SignClient } from '@walletconnect/sign-client';
-import { addressFromAccount, chipnetAddress } from './address';
+import { addressFromAccount, networkAddress } from './address';
+import { PREFIX } from '../../services/network';
 import type { Pairing } from './wallets';
 
 import { walletConnectProjectId as projectId } from './wallets';
@@ -35,15 +36,15 @@ function signClient() {
 }
 
 /**
- * WalletConnect v2 with the Bitcoin Cash namespace (wc2-bch-bcr). Chipnet is preferred; a wallet
- * that only offers mainnet still identifies the same key, whose Chipnet address receives trees.
+ * WalletConnect v2 with the Bitcoin Cash namespace (wc2-bch-bcr). This build's network is preferred;
+ * a wallet that only offers the other one still identifies the same key, whose address here receives trees.
  * Focus Garden only needs the address, so the session is closed once it is known.
  */
 export async function startWalletConnect(): Promise<Pairing> {
   const sign = await signClient();
   const { uri, approval } = await sign.connect({
     optionalNamespaces: {
-      bch: { chains: ['bch:bchtest', 'bch:bitcoincash'], methods: ['bch_getAddresses', 'bch_signTransaction', 'bch_signMessage'], events: ['addressesChanged'] },
+      bch: { chains: [`bch:${PREFIX}`, PREFIX === 'bitcoincash' ? 'bch:bchtest' : 'bch:bitcoincash'], methods: ['bch_getAddresses', 'bch_signTransaction', 'bch_signMessage'], events: ['addressesChanged'] },
     },
   });
   if (!uri) throw new Error('WalletConnect did not return a pairing link.');
@@ -52,10 +53,10 @@ export async function startWalletConnect(): Promise<Pairing> {
     const namespace = session.namespaces.bch;
     let address = (namespace?.accounts ?? []).map(addressFromAccount).find((value): value is string => Boolean(value));
     if (!address) {
-      const chainId = namespace?.chains?.[0] ?? namespace?.accounts?.[0]?.split(':').slice(0, 2).join(':') ?? 'bch:bchtest';
+      const chainId = namespace?.chains?.[0] ?? namespace?.accounts?.[0]?.split(':').slice(0, 2).join(':') ?? `bch:${PREFIX}`;
       const reported = await sign.request<string[]>({ topic: session.topic, chainId, request: { method: 'bch_getAddresses', params: {} } });
       if (!reported?.[0]) throw new Error('The wallet did not share an address.');
-      address = chipnetAddress(reported[0]);
+      address = networkAddress(reported[0]);
     }
     void sign.disconnect({ topic: session.topic, reason: { code: 6000, message: 'Linked to Focus Garden.' } }).catch(() => undefined);
     if (cancelled) throw new Error('Cancelled.');
