@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { AppState, Text } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { restoreNativeWallet } from '../features/wallet/wallet';
+import { connectExistingWallet, restoreNativeWallet } from '../features/wallet/wallet';
 import { recoveryPhraseSchema } from '../features/wallet/mnemonic';
 import * as SecureStore from 'expo-secure-store';
 import Storage from 'expo-sqlite/kv-store';
@@ -31,7 +31,12 @@ export default function RestoreWalletScreen() {
     if (!validated.success) { setNotice(validated.error.issues[0]?.message ?? 'Check the words and their order.'); return; }
     setStatus('saving'); setNotice('');
     try {
-      if (kind === 'xo') await restoreNativeWallet(validated.data);
+      if (kind === 'xo') {
+        await restoreNativeWallet(validated.data);
+        // The wallet's address is cached when the wallet first opens. Open it now, from the restored
+        // phrase, so reopening the wallets below finds it (otherwise it reads as unavailable).
+        await connectExistingWallet();
+      }
       else await restoreRawWallet(validated.data, { read: () => SecureStore.getItemAsync('focusgarden.chipnet.internal.v1'), save: (key) => SecureStore.setItemAsync('focusgarden.chipnet.internal.v1', key, { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY }) });
       Storage.setItemSync('focusgarden.active.wallet.v1', kind);
       await rewards.open();
