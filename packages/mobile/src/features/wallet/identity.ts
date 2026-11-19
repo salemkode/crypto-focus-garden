@@ -12,6 +12,6 @@ export function readStoredWalletIdentity(mnemonic: string | null, readAddress: (
   const address = readAddress(walletAddressCacheKey(recoveryPhraseSchema.parse(mnemonic)));
   if (address === null) return null;
   const decoded = cashAddressToLockingBytecode(address);
-  if (typeof decoded === 'string' || !address.startsWith('bchtest:') || decoded.bytecode.length !== 25 || binToHex(decoded.bytecode).slice(0, 6) !== '76a914') throw new WalletInitializationError({ message: 'The saved chipnet wallet address is invalid. Open the wallet to check its storage.' });
+  if (typeof decoded === 'string' || !address.startsWith('bchtest:') || decoded.bytecode.length !== 25 || binToHex(decoded.bytecode).slice(0, 6) !== '76a914') throw new WalletInitializationError({ message: 'The saved Chipnet wallet address is invalid. Open the wallet to check its storage.' });
   return { address, lockingBytecode: decoded.bytecode };
 }

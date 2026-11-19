@@ -38,7 +38,7 @@ export default function SessionSheet() {
   // "Busy" alone is any transaction or refresh; it means connecting only while the garden has not loaded yet (as on Leaders).
   const reconnecting = rewards.status === 'opening' || (rewards.status === 'busy' && Boolean(rewards.account) && rewards.data.state !== 'connected');
 
-  return <Screen>
+  return <Screen sheet={{ title: 'Next session' }}>
     <Group footer="For longer focus, plant again and merge.">
       <MenuPicker title="Length" options={lengths} value={String(garden.duration)} disabled={locked} onChange={(next) => configure({ duration: Number(next) })} />
       <MenuPicker title="Tag" options={TAG_OPTIONS} value={garden.tag} disabled={locked} onChange={(next) => configure({ tag: next })} />

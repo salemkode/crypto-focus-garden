@@ -15,13 +15,24 @@ export type ScreenProps = Omit<ScrollViewProps, 'refreshControl'> & {
   /** Pull to refresh. */
   onRefresh?: () => void;
   refreshing?: boolean;
+  /**
+   * A form sheet. Android's native stack draws neither a header nor a grabber on sheets, so the
+   * screen draws both (with the sheet's title, when it has one). iOS draws its own and ignores this.
+   */
+  sheet?: { title?: string };
 };
 
-export function Screen({ children, title, accessory, contentClassName = '', onRefresh, refreshing = false, ...rest }: ScreenProps) {
+export function Screen({ children, title, accessory, contentClassName = '', onRefresh, refreshing = false, sheet, ...rest }: ScreenProps) {
   const insets = useSafeAreaInsets();
   // Headerless Android tabs need their own inset; pushed screens already have a native header.
   // iOS uses Screen.ios.tsx, where the native Form handles its safe area.
   return <View className="flex-1 bg-canvas" style={title ? { paddingTop: insets.top } : undefined}>
+    {sheet ? <View className="px-5 pb-1">
+      <View className="h-6 items-center justify-center" importantForAccessibility="no-hide-descendants">
+        <View style={{ backgroundColor: color.ink3 }} className="h-1 w-8 rounded-full opacity-40" />
+      </View>
+      {sheet.title ? <Text accessibilityRole="header" numberOfLines={1} className="text-title-3 text-ink">{sheet.title}</Text> : null}
+    </View> : null}
     <ScrollView className="flex-1" contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" {...rest}
       refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={color.moss} /> : undefined}
       contentContainerClassName={`gap-7 px-4 pb-16 pt-2 ${contentClassName}`}>

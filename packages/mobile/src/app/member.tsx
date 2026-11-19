@@ -24,7 +24,7 @@ export default function MemberSheet() {
   const rewards = useRewards();
   const [amount, setAmount] = useState<number>(5000);
   const [sending, setSending] = useState(false);
-  if (!member) return <Screen>
+  if (!member) return <Screen sheet={{}}>
     <EmptyState icon={icons.people} title="Nobody selected" detail="Open someone from the leaderboard" />
     <Button variant="secondary" label="Close" onPress={close} />
   </Screen>;
@@ -41,7 +41,7 @@ export default function MemberSheet() {
       } },
     ]);
   }
-  return <Screen>
+  return <Screen sheet={{}}>
     <View className="flex-row items-center gap-4">
       <Stage round style={{ width: 76, height: 76 }}><Model3D spec={{ tier: tier.key, species: 'oak', seed: member.rank * 11 }} size={74} /></Stage>
       <View className="flex-1 items-start gap-1.5">

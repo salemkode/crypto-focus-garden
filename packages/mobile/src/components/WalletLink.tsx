@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, Keyboard, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import QRCode from 'react-native-qrcode-svg';
@@ -40,6 +40,8 @@ export const WalletLink = nativeAware(function WalletLink({ onLinked }: { onLink
   const choosing = !linked || changing;
 
   async function saveManual() {
+    // Close the keyboard so the result below the field is in view.
+    Keyboard.dismiss();
     setTried(true); setSaving(true);
     const refused = await rewards.saveRecipient(draft).finally(() => setSaving(false));
     if (refused) return;

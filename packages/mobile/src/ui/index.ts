@@ -14,4 +14,4 @@ export { nativeAware } from './native/aware';
 export { Segmented } from './Segmented';
 export { Stage } from './Stage';
 export { Stats } from './Stats';
-export { color, continuous, floatingShadow, headerOptions, numerals } from './tokens';
+export { color, continuous, floatingShadow, headerOptions, numerals, sheetOptions } from './tokens';

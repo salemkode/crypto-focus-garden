@@ -9,7 +9,7 @@ import { ModelSnapshotHost } from '../components/ModelSnapshots';
 import { FocusProvider } from '../features/focus/FocusProvider';
 import { RewardProvider } from '../features/rewards/RewardProvider';
 import { isOnboarded } from '../features/profile/local';
-import { headerOptions } from '../ui/tokens';
+import { headerOptions, sheetOptions } from '../ui/tokens';
 
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 // Let Tailwind classes style animated views the same way as plain views.
@@ -33,11 +33,11 @@ export default function RootLayout() {
     <Stack screenOptions={{ ...headerOptions, headerBackButtonDisplayMode: 'minimal' }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="welcome" options={{ headerShown: false, presentation: 'fullScreenModal', gestureEnabled: false, animation: 'fade' }} />
-      <Stack.Screen name="session" options={{ title: 'Next session', presentation: 'formSheet', sheetAllowedDetents: [0.75, 1], sheetGrabberVisible: true }} />
+      <Stack.Screen name="session" options={{ title: 'Next session', presentation: 'formSheet', sheetAllowedDetents: [0.75, 1], sheetGrabberVisible: true, ...sheetOptions }} />
       {/* The member card starts with the member's name, so the sheet has no empty title bar. */}
-      <Stack.Screen name="member" options={{ headerShown: false, presentation: 'formSheet', sheetAllowedDetents: [0.6, 1], sheetGrabberVisible: true }} />
+      <Stack.Screen name="member" options={{ headerShown: false, presentation: 'formSheet', sheetAllowedDetents: [0.6, 1], sheetGrabberVisible: true, ...sheetOptions }} />
       <Stack.Screen name="species" options={{ title: 'Tree styles', presentation: 'modal' }} />
-      <Stack.Screen name="link-wallet" options={{ title: 'Your wallet', presentation: 'formSheet', sheetAllowedDetents: [0.6, 1], sheetGrabberVisible: true }} />
+      <Stack.Screen name="link-wallet" options={{ title: 'Your wallet', presentation: 'formSheet', sheetAllowedDetents: [0.6, 1], sheetGrabberVisible: true, ...sheetOptions }} />
       <Stack.Screen name="settings" options={{ title: 'Focus rules', presentation: 'modal' }} />
       <Stack.Screen name="blocked-apps" options={{ title: 'Blocked apps' }} />
       <Stack.Screen name="on-bitcoin" options={{ title: 'On Bitcoin Cash', presentation: 'modal' }} />

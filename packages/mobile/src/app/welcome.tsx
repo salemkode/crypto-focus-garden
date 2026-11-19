@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { router } from 'expo-router';
-import { AccessibilityInfo, AppState, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, useWindowDimensions, View, type ScrollViewInstance } from 'react-native';
+import { AccessibilityInfo, AppState, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, useWindowDimensions, View, type ScrollViewInstance } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { BlockDemo, LeaveDemo, PlantDemo, TiersDemo, type DemoProps } from '../components/onboarding/Demos';
@@ -38,6 +38,13 @@ export default function Welcome() {
   const scroller = useRef<ScrollViewInstance>(null);
   const [page, setPage] = useState(0);
   const [asking, setAsking] = useState(false);
+  /** While typing an address the footer steps aside, so the field's own Link button stays in view. */
+  const [typing, setTyping] = useState(false);
+  useEffect(() => {
+    const shown = Keyboard.addListener('keyboardDidShow', () => setTyping(true));
+    const hidden = Keyboard.addListener('keyboardDidHide', () => setTyping(false));
+    return () => { shown.remove(); hidden.remove(); };
+  }, []);
   /** Set once the permission prompt has been answered here; if access is still off, the page says so and moves on. */
   const [asked, setAsked] = useState(false);
   const rewards = useRewards();
@@ -108,7 +115,8 @@ export default function Welcome() {
       : <Button label="Not now" variant="secondary" onPress={finish} />;
 
   return <SafeAreaView className="flex-1 bg-canvas">
-    <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    {/* Android draws edge to edge, so the window no longer shrinks for the keyboard: pad on both platforms. */}
+    <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'web' ? undefined : 'padding'}>
       {/* The last page has its own way out, so Skip gives way to it; the row keeps its height. */}
       <View className="min-h-12 flex-row justify-end px-4 pt-1">{page < LAST ? <Button variant="plain" size="medium" label="Skip" onPress={finish} /> : null}</View>
       <ScrollView ref={scroller} horizontal pagingEnabled showsHorizontalScrollIndicator={false} scrollEventThrottle={16} keyboardShouldPersistTaps="handled"
@@ -132,7 +140,7 @@ export default function Welcome() {
           <WalletLink />
         </ScrollView>
       </ScrollView>
-      <View className="gap-3 px-6 pb-2 pt-2">
+      {typing ? null : <View className="gap-3 px-6 pb-2 pt-2">
         <View accessible accessibilityRole="adjustable" accessibilityLabel={`Page ${page + 1} of ${COUNT}`}
           accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
           onAccessibilityAction={(event) => go(page + (event.nativeEvent.actionName === 'increment' ? 1 : -1))}
@@ -145,7 +153,7 @@ export default function Welcome() {
           {asksPermission ? <Button variant="plain" size="medium" label="Not now" onPress={() => go(page + 1)} />
             : declined ? <Button variant="plain" size="medium" label="Try again" busy={asking} onPress={() => void allowBlocking()} /> : null}
         </View>
-      </View>
+      </View>}
     </KeyboardAvoidingView>
   </SafeAreaView>;
 }

@@ -65,6 +65,12 @@ export const headerOptions = Platform.OS === 'ios' ? {
 };
 
 /**
+ * Form sheets. iOS keeps the system corner radius; Android's defaults to square corners, so it gets
+ * Material 3's 28 dp sheet radius (its grabber and title are drawn by `Screen` with `sheet`).
+ */
+export const sheetOptions = Platform.OS === 'android' ? { sheetCornerRadius: 28 } : {};
+
+/**
  * Tab roots: the router's bar stays hidden. On iOS the screen draws a SwiftUI navigation bar with an
  * inline large title (see ui/Screen.ios); on Android the screen draws its title under the status bar.
  */

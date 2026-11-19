@@ -85,7 +85,7 @@ export function parseRewardAddress(address: string) {
   const normalized = address.toLowerCase();
   const [prefix, encoded, extra] = normalized.split(":");
   if (extra || prefix !== "bchtest" || !encoded || encoded.length !== 42)
-    throw new Error("Use a full chipnet BCH address beginning with bchtest:");
+    throw new Error("Use a full Chipnet address that starts with bchtest:");
   const values = [...encoded].map((char) => alphabet.indexOf(char));
   if (
     values.some((value) => value < 0) ||
