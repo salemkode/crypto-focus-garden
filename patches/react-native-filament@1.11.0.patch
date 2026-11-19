@@ -652,7 +652,6 @@ index 20ec04e..eb54f74 100644
        // Cleanup in worklets context, as cleanup functions might also use the worklet context
        // and we want to queue our cleanup after all other worklets have run
        setTimeout(() => {
-
 diff --git a/android/CMakeLists.txt b/android/CMakeLists.txt
 --- a/android/CMakeLists.txt
 +++ b/android/CMakeLists.txt

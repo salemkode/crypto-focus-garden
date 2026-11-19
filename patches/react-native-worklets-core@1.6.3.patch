@@ -220,7 +220,6 @@ index 403d88bf7d89f57ac18fdffe4b7aa839a62234b0..f5ec7b1c7be8fabb3a6c1d171f61c840
    return std::make_shared<facebook::react::NativeWorkletsSpecJSI>(params);
  }
  #endif
-
 diff --git a/android/CMakeLists.txt b/android/CMakeLists.txt
 --- a/android/CMakeLists.txt
 +++ b/android/CMakeLists.txt
