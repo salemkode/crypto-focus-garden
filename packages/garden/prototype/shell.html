@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Your Valley · prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root { --ink:#2E2640; --gold:#F2B53C; --glass:rgba(255,255,255,.62); --line:rgba(46,38,64,.10); }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Rubik, system-ui, sans-serif; color:var(--ink); }
+  #app { --sky-top:#FFD9B3; --sky-bottom:#CFE8EE; position:relative; width:100%; max-width:430px; height:/*APPHEIGHT*/; margin:0 auto; overflow:hidden; border-radius:28px; background:linear-gradient(180deg,var(--sky-top),var(--sky-bottom)); transition:background .8s; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+  .glass { background:var(--glass); backdrop-filter:blur(18px) saturate(1.4); -webkit-backdrop-filter:blur(18px) saturate(1.4); border:1px solid rgba(255,255,255,.55); }
+  header { position:absolute; top:max(14px,env(safe-area-inset-top)); left:14px; right:14px; display:flex; justify-content:space-between; align-items:center; gap:8px; pointer-events:none; }
+  header > * { pointer-events:auto; }
+  .chip { border-radius:999px; padding:9px 14px; font-weight:500; font-size:14px; display:flex; align-items:center; gap:8px; }
+  .dot { width:9px; height:9px; border-radius:50%; background:#5E9E4A; }
+  .ages { position:absolute; top:calc(max(14px,env(safe-area-inset-top)) + 52px); left:50%; transform:translateX(-50%); display:flex; gap:4px; padding:4px; border-radius:999px; }
+  .ages button { border:0; background:none; font:500 12px Rubik; color:var(--ink); padding:6px 10px; border-radius:999px; cursor:pointer; opacity:.7; }
+  .ages button.on { background:var(--ink); color:#fff; opacity:1; }
+  #dock { position:absolute; left:12px; right:12px; bottom:max(12px,env(safe-area-inset-bottom)); max-width:520px; margin:0 auto; border-radius:28px; padding:14px; display:flex; flex-direction:column; gap:12px; }
+  .styles { display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; }
+  .style { flex:none; border:0; border-radius:999px; padding:8px 12px; font:500 14px Rubik; color:var(--ink); background:rgba(255,255,255,.6); display:flex; align-items:center; gap:7px; cursor:pointer; }
+  .style i { width:11px; height:11px; border-radius:3px; display:block; }
+  .style.on { background:var(--ink); color:#fff; }
+  .row { display:flex; gap:10px; }
+  .length { flex:1; border:0; border-radius:20px; background:rgba(255,255,255,.65); display:flex; align-items:center; justify-content:space-between; padding:10px 14px; cursor:pointer; color:var(--ink); }
+  .mins { font:400 34px Rubik; font-variant-numeric:tabular-nums; letter-spacing:-.5px; }
+  .grows { text-align:right; font:500 14px Rubik; } .grows small { font-weight:400; opacity:.6; }
+  .plant { border:0; border-radius:20px; background:var(--gold); color:var(--ink); font:700 19px Rubik; padding:0 26px; cursor:pointer; box-shadow:0 6px 18px rgba(242,181,60,.45); }
+  .plant:active { transform:translateY(1px); }
+  .growing { text-align:center; padding:4px 0 2px; }
+  .eyebrow { font:500 14px Rubik; color:#a27412; }
+  .clock { font:400 64px Rubik; font-variant-numeric:tabular-nums; letter-spacing:-2px; line-height:1.05; }
+  .ghost { border:0; background:none; font:500 15px Rubik; color:#a14940; padding:8px 18px; cursor:pointer; }
+  .seasons { position:absolute; top:calc(max(14px,env(safe-area-inset-top)) + 96px); left:50%; transform:translateX(-50%); display:flex; gap:4px; padding:4px; border-radius:999px; }
+  .seasons button { border:0; background:none; font:500 12px Rubik; color:var(--ink); padding:6px 10px; border-radius:999px; cursor:pointer; opacity:.7; }
+  .seasons button.on { background:var(--gold); opacity:1; }
+  .merge { border:0; border-radius:16px; padding:12px; font:700 15px Rubik; color:#fff; background:linear-gradient(90deg,#2E2640,#5b3f8a); cursor:pointer; box-shadow:0 6px 18px rgba(46,38,64,.35); }
+  #reveal { position:absolute; top:34%; left:50%; transform:translate(-50%,-50%) scale(.85); padding:18px 24px; border-radius:24px; text-align:center; opacity:0; transition:.45s cubic-bezier(.2,1.4,.4,1); pointer-events:none; min-width:240px; }
+  #reveal.show { opacity:1; transform:translate(-50%,-50%) scale(1); }
+  #reveal .badge { display:inline-block; background:var(--gold); color:var(--ink); font:700 12px Rubik; padding:4px 10px; border-radius:999px; }
+  #reveal .title { font:700 22px Rubik; margin:8px 0 4px; }
+  #reveal .sub { font:400 13px Rubik; opacity:.75; }
+  #app.legend { background:linear-gradient(180deg,#c9b8f0,var(--sky-top) 45%,var(--sky-bottom)); }
+  /* The floating card: springs out of the object, bobs gently, follows it every frame. */
+  #card { position:absolute; left:0; top:0; width:min(280px, 78%); transform:translate(-50%,-100%); pointer-events:none; z-index:6; }
+  #card.below { transform:translate(-50%,0); }
+  #card .bubble { position:relative; padding:12px 14px 13px; border-radius:20px; background:rgba(255,255,255,.88); backdrop-filter:blur(16px) saturate(1.4); -webkit-backdrop-filter:blur(16px) saturate(1.4); border:1px solid rgba(255,255,255,.7);
+    box-shadow:0 14px 34px rgba(46,38,64,.22); transform-origin:50% 100%; transform:scale(.35) translateY(18px); opacity:0;
+    transition:transform .5s cubic-bezier(.18,1.55,.4,1), opacity .25s ease; }
+  #card.below .bubble { transform-origin:50% 0; transform:scale(.35) translateY(-18px); }
+  #card.show { pointer-events:auto; }
+  #card.show .bubble { transform:none; opacity:1; animation:bob 3.2s ease-in-out .5s infinite; }
+  #card .stem { position:absolute; left:50%; bottom:-7px; width:14px; height:14px; margin-left:-7px; background:rgba(255,255,255,.88); transform:rotate(45deg) scale(0); transition:transform .35s cubic-bezier(.2,1.6,.4,1) .08s; border-radius:3px; }
+  #card.below .stem { bottom:auto; top:-7px; }
+  #card.show .stem { transform:rotate(45deg) scale(1); }
+  @keyframes bob { 0%,100% { transform:translateY(0) } 50% { transform:translateY(-4px) } }
+  #card .eyebrow { font:500 11px Rubik; color:#a27412; letter-spacing:.2px; }
+  #card .name { font:700 18px Rubik; margin:2px 0 4px; padding-right:22px; line-height:1.2; }
+  #card .facts { font:400 13px Rubik; line-height:1.5; opacity:.8; }
+  #card .live { color:#4E8F3A; font-weight:500; }
+  #card .note { display:block; font:500 12px Rubik; margin-top:8px; opacity:.85; }
+  #card textarea { display:block; width:100%; margin-top:4px; border:1px solid rgba(46,38,64,.15); border-radius:12px; padding:7px 9px; font:400 13px Rubik; color:var(--ink); background:rgba(255,255,255,.75); resize:none; }
+  #card .close { position:absolute; top:6px; right:9px; border:0; background:none; font:400 20px Rubik; color:var(--ink); cursor:pointer; opacity:.6; }
+  @media (prefers-reduced-motion: reduce) { #card .bubble, #card .stem { transition:opacity .2s; animation:none !important; } }
+  #fps { position:absolute; left:16px; top:calc(max(14px,env(safe-area-inset-top)) + 140px); font:500 11px Rubik; opacity:.55; }
+  #planner { position:absolute; left:12px; right:12px; bottom:max(12px,env(safe-area-inset-bottom)); max-width:520px; margin:0 auto; padding:16px; border-radius:26px; opacity:0; transform:translateY(20px); transition:.3s; pointer-events:none; z-index:5; background:rgba(255,255,255,.86); }
+  #planner.show { opacity:1; transform:none; pointer-events:auto; }
+  #planner .head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+  #planner .eyebrow { font:500 12px Rubik; color:#a27412; } #planner .name { font:700 19px Rubik; }
+  #planner .close { border:0; background:none; font:400 24px Rubik; color:var(--ink); cursor:pointer; }
+  #planner .option { display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-top:1px solid rgba(46,38,64,.08); }
+  #planner .option b { font:500 14px Rubik; display:block; } #planner .option small { font:400 12px Rubik; opacity:.6; }
+  #planner .stepper { display:flex; align-items:center; gap:10px; } #planner .stepper span { font:500 16px Rubik; min-width:22px; text-align:center; font-variant-numeric:tabular-nums; }
+  #planner .stepper button { width:34px; height:34px; border-radius:50%; border:0; background:rgba(46,38,64,.08); font:500 18px Rubik; color:var(--ink); cursor:pointer; }
+  #planner .cascade { display:flex; gap:8px; align-items:center; font:400 13px Rubik; margin:10px 0; }
+  #planner .actions { display:flex; gap:8px; } #planner .actions button { flex:1; border:0; border-radius:16px; padding:12px; font:700 15px Rubik; cursor:pointer; }
+  #planner .all { background:rgba(46,38,64,.08); color:var(--ink); } #planner .go { background:linear-gradient(90deg,#2E2640,#5b3f8a); color:#fff; } #planner .go:disabled { opacity:.4; }
+  #planner .preview { font:400 13px Rubik; opacity:.7; margin-top:8px; text-align:center; }
+  #toast { position:absolute; top:40%; left:50%; transform:translate(-50%,10px); padding:12px 18px; border-radius:18px; font:500 16px Rubik; opacity:0; transition:.35s; pointer-events:none; }
+  #toast.show { opacity:1; transform:translate(-50%,0); }
+  button:focus-visible { outline:2px solid var(--ink); outline-offset:2px; }
+  @media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
+</style></head>
+<body><div id="app">
+<canvas aria-label="Your valley. Drag to look around, pinch or scroll to zoom."></canvas>
+<header><div class="chip glass"><span class="dot"></span>Wallet</div><div class="chip glass" id="count"></div><div class="chip glass">⚙︎</div></header>
+<div class="ages glass" role="group" aria-label="Preview a valley after"><button data-age="10" class="on">First weeks</button><button data-age="40">Months</button><button data-age="120">A year</button><button data-age="300">Years</button></div>
+<div class="seasons glass" role="group" aria-label="Season"><button data-season="spring">Spring</button><button data-season="summer">Summer</button><button data-season="autumn">Autumn</button><button data-season="winter">Winter</button></div>
+<div id="toast" class="glass" role="status"></div>
+<div id="reveal" class="glass" role="status" aria-live="polite"></div>
+<div id="card" class="glass" role="dialog" aria-label="Details"></div>
+<div id="planner" class="glass" role="dialog" aria-label="Merge planner"></div>
+<div id="fps"></div>
+<div id="dock" class="glass"></div>
+</div><script>/*BUNDLE*/</script>
+</body></html>

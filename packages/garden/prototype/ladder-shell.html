@@ -1,0 +1,24 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The ladder · prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root { --ink:#2E2640; --gold:#F2B53C; }
+  body { margin:0; font-family:Rubik, system-ui, sans-serif; color:var(--ink); }
+  #app { position:relative; width:100%; height:/*APPHEIGHT*/; overflow:hidden; border-radius:24px; background:linear-gradient(180deg,#FFD9B3,#CFE8EE); }
+  canvas { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
+  .glass { background:rgba(255,255,255,.66); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border:1px solid rgba(255,255,255,.6); }
+  .label { position:absolute; left:0; top:0; padding:4px 8px; border-radius:10px; font:500 10px Rubik; max-width:132px; white-space:normal; white-space:nowrap; pointer-events:none; text-align:center; }
+  .label b { display:inline-grid; place-items:center; width:16px; height:16px; border-radius:5px; background:var(--ink); color:#fff; font-size:10px; margin-right:3px; }
+  .label small { display:block; font-weight:400; opacity:.65; }
+  .bar { position:absolute; left:12px; right:12px; bottom:12px; display:flex; gap:6px; flex-wrap:wrap; padding:8px; border-radius:20px; align-items:center; }
+  .bar button { border:0; border-radius:999px; padding:7px 12px; font:500 13px Rubik; color:var(--ink); background:rgba(255,255,255,.7); cursor:pointer; }
+  .bar button.on { background:var(--ink); color:#fff; }
+  .bar #reroll { margin-left:auto; background:var(--gold); font-weight:700; }
+  h1 { position:absolute; top:14px; left:16px; margin:0; font:700 18px Rubik; }
+  h1 small { display:block; font:400 12px Rubik; opacity:.7; }
+</style></head><body><div id="app">
+<canvas aria-label="The ten levels. Drag to look around, scroll to zoom."></canvas>
+<h1>The ladder<small>One session grows levels 1–3 (max 1 hour). Everything above is merged.</small></h1>
+<div id="labels"></div>
+<div class="bar glass"><button data-style="oak">Oak</button><button data-style="cherry" class="on">Cherry</button><button data-style="maple">Maple</button><button data-style="pine">Pine</button><button data-style="birch">Birch</button><button data-style="cash">Cash</button><button id="reroll">Re-roll unique details</button></div>
+</div><script>/*BUNDLE*/</script></body></html>

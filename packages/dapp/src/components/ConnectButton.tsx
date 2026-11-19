@@ -57,60 +57,56 @@ const ConnectButton: React.FC = () => {
 	};
 
 	return (
-		<div className="flex flex-col w-full">
+		<div className="inline-flex flex-col">
 			{isConnected ? (
-				<div className="flex flex-row items-center gap-4">
-					<div className="flex flex-col items-end md:items-start">
-						<span className="text-sm font-mono text-emerald-200/80">
+				<div className="flex flex-row items-center gap-2 rounded-2xl bg-paper/95 py-2 pl-4 pr-2 shadow-[0_4px_0_rgb(29_58_42/0.18)]">
+					<div className="flex flex-col leading-tight">
+						<span className="text-[11px] font-mono text-ink-soft">
 							{formatAddress(address || "")}
 						</span>
-						<span className="text-xs font-bold text-white">
+						<span className="text-sm font-extrabold text-ink">
 							{formatBalance(balance ?? 0)}
 						</span>
 					</div>
 					<button
+						type="button"
 						onClick={() => refetch()}
-						className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all"
-						title="Refresh Balance"
+						className="block-btn block-btn--sm block-btn--sand ml-1 p-2"
+						title="Refresh balance"
+						aria-label="Refresh balance"
 					>
 						<svg
 							className="w-4 h-4"
 							fill="none"
 							stroke="currentColor"
 							viewBox="0 0 24 24"
+							aria-hidden="true"
 						>
 							<path
 								strokeLinecap="round"
 								strokeLinejoin="round"
-								strokeWidth={2}
+								strokeWidth={2.5}
 								d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
 							/>
 						</svg>
-						<span className="text-xs font-medium">Refresh</span>
 					</button>
 					<button
+						type="button"
 						onClick={disconnectWallet}
 						disabled={loading}
-						className={`px-4 py-2 rounded-xl font-bold text-white text-sm transition-all shadow-lg ${
-							loading
-								? "bg-slate-600 cursor-not-allowed"
-								: "bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-200"
-						}`}
+						className="block-btn block-btn--sm block-btn--sand px-3 py-2.5 text-xs"
 					>
-						{loading ? "..." : "Disconnect"}
+						{loading ? "…" : "Disconnect"}
 					</button>
 				</div>
 			) : (
 				<button
+					type="button"
 					onClick={connectWallet}
 					disabled={loading}
-					className={`px-6 py-2.5 rounded-xl font-bold text-white text-sm transition-all shadow-lg ${
-						loading
-							? "bg-slate-600 cursor-not-allowed"
-							: "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20"
-					}`}
+					className={`block-btn px-6 py-3.5 text-[15px] ${loading ? "block-btn--wait" : ""}`}
 				>
-					{loading ? "Connecting..." : "Connect Wallet"}
+					{loading ? "Connecting…" : "Connect wallet"}
 				</button>
 			)}
 		</div>

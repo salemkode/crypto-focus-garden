@@ -1,0 +1,14 @@
+# Operator replaces hostname and configures DNS/TLS. No agent publication.
+{$GARDEN_HOSTNAME} {
+  request_body {
+    max_size 250KB
+  }
+  header {
+    Cache-Control "no-store"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "no-referrer"
+    -Server
+  }
+  reverse_proxy 127.0.0.1:3487
+  # Do not enable request/body/Authorization logging.
+}

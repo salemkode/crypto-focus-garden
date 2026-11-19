@@ -108,3 +108,40 @@ cache
 .dynamodb/
 
 manual-test.ts
+
+# Local funding service state and credentials
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.credential
+
+# Scoped testnet build outputs and process locks
+artifacts/testnet-delivery/binaries/
+*.service-lock
+*.request-lock
+
+# Local evidence and device-test output (kept on disk, not published)
+/artifacts/
+/.argent/recordings/
+/.argent/*.json
+
+# Generated garden prototype bundles (rebuild with `bun packages/garden/prototype/build.ts`
+# and `bun packages/garden/prototype/build-ladder.ts`)
+packages/garden/prototype/valley*.html
+packages/garden/prototype/ladder.html
+packages/garden/prototype/ladder-embed.html
+
+# Local env files
+.env.local
+.env.*.local
+
+# Internal working notes and QA tooling (kept locally, not published)
+/PROJECT-HANDOFF.md
+/WORK-STATUS.md
+/RELEASE-STATUS.md
+/docs/native-intermediates-inventory-*
+/docs/android-apk-acceptance-*.md
+/.argent/
+
+# Swift Package Manager cache
+.build/

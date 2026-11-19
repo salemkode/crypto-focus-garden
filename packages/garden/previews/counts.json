@@ -1,0 +1,34 @@
+{
+  "sprout": {
+    "oak": 11,
+    "cherry": 11,
+    "pine": 11,
+    "maple": 11,
+    "birch": 11,
+    "cash": 11
+  },
+  "tree": {
+    "oak": 173,
+    "cherry": 173,
+    "pine": 237,
+    "maple": 185,
+    "birch": 141,
+    "cash": 173
+  },
+  "bigTree": {
+    "oak": 841,
+    "cherry": 841,
+    "pine": 817,
+    "maple": 871,
+    "birch": 600,
+    "cash": 841
+  },
+  "house": {
+    "oak": 811,
+    "cherry": 811,
+    "pine": 837,
+    "maple": 814,
+    "birch": 799,
+    "cash": 811
+  }
+}

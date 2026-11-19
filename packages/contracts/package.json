@@ -14,6 +14,7 @@
 	},
 	"scripts": {
 		"build": "yarn compile",
+		"deploy": "tsx tasks/deploy.ts",
 		"build:test": "yarn clean:test && yarn compile:test",
 		"clean": "rm -rf ./dist",
 		"clean:test": "rm -rf ./dist-test",
@@ -22,13 +23,15 @@
 		"lint": "eslint . --ext .ts --ignore-path ../../.eslintignore",
 		"prepublishOnly": "yarn test && yarn lint",
 		"pretest": "yarn build:test",
+		"test:pomodoro": "tsx tasks/index.ts compile && tsc -p tsconfig.pomodoro-test.json && NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --runInBand --forceExit --testPathPattern=\"contract/(PomodoroRewards|CreditPolicy|FocusForest|Deploy)\\.test\"",
 		"test": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --forceExit",
 		"postinstall": "patch-package || true",
 		"watch": "tsc -p tsconfig.json --watch"
 	},
 	"dependencies": {
 		"@bch-wc2/cashscript-signer": "^0.0.15",
-		"@bch-wc2/mainnet-js-signer": "^0.0.15"
+		"@bch-wc2/mainnet-js-signer": "^0.0.15",
+		"zod": "^4.1.12"
 	},
 	"peerDependencies": {
 		"cashscript": "next",
