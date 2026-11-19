@@ -8,7 +8,7 @@ export const DOWNLOADS = {
 	/** Android: a Play Store link or a direct .apk URL. */
 	android: "",
 	/** Web version of the app (Expo web build). */
-	web: "",
+	web: "https://focus-garden-app.netlify.app",
 } as const;
 
 /** Shown in the footer and FAQ. Switch to "mainnet" only after a mainnet deployment. */
