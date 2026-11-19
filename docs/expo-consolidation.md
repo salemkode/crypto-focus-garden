@@ -4,7 +4,7 @@ Snapshot: 15 November 2026. Branch: `feat/unify-focus-garden-expo`. The user exp
 
 ## Canonical architecture
 
-- `packages/dapp`: original Next.js web garden and web contract integration.
+- `packages/dapp`: original Next.js web garden and web contract integration (removed on 19 November 2026; the landing page and the Expo web app replace it).
 - `packages/contracts`: authoritative v3 CashScript covenant and credit policy. Its external recipient is fixed at planting; actual relative lock enforcement remains on-chain.
 - `packages/mobile`: **one** Expo SDK 58 / React Native 0.88 / Expo Router application. The previous SDK 54 shell has been replaced, not kept as another runtime.
 - `packages/garden`: original voxel island/tree/sapling models shared by both web and mobile. Web uses Three.js WebGL; mobile uses Expo GL/Three. No WebView or unrelated native checkerboard substitutes for the original garden.

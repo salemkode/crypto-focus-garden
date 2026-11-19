@@ -24,7 +24,7 @@
 				"noImgElement": "off"
 			}
 		},
-		"includes": ["**/*.ts", "**/*.tsx", "!packages/dapp/src/utils.ts"]
+		"includes": ["**/*.ts", "**/*.tsx"]
 	},
 	"javascript": {
 		"formatter": {

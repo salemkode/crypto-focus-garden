@@ -46,7 +46,6 @@ This year we solved that and rebuilt the product around it.
 | `packages/contracts` | CashScript contracts: `FocusForest` (locks and grows trees), `FocusDirectory` (public profiles), and the earlier `PomodoroRewards`. |
 | `packages/protocol` | Shared rules: reward sizes, tree styles and the on-chain data format. |
 | `packages/service` | The garden service that pays network fees for planting and claiming, with an operator-owned BCHN node. |
-| `packages/dapp` | The 2025 hackathon web dApp (legacy). |
 
 Inside the app:
 
