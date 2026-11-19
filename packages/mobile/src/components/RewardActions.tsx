@@ -1,3 +1,4 @@
+import { currencyDisclosure, isMainnet } from '../services/network';
 import { useState } from 'react';
 import { router } from 'expo-router';
 import { Alert, View } from 'react-native';
@@ -18,7 +19,7 @@ const sentence = (name: string) => name.charAt(0) + name.slice(1).toLowerCase();
 const TIER_OPTIONS = FOREST_TIERS.map((entry) => ({ id: String(entry.code), label: sentence(entry.name) }));
 const SPECIES_OPTIONS = FOREST_SPECIES.map((entry) => ({ id: String(entry.code), label: sentence(entry.name) }));
 /** Costs as the confirmations state them (the service's fixed policy), paid from the Focus Garden wallet. */
-const TEST_COINS = 'in test coins with no cash value';
+
 
 export const RewardActions = nativeAware(function RewardActions() {
   const rewards = useRewards();
@@ -43,7 +44,7 @@ export const RewardActions = nativeAware(function RewardActions() {
   }
   function confirmPlant() {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(`Lock ${length} for a ${size}?`, `Your ${size} is locked on Bitcoin Cash for ${length} and shows above while it grows. Then send it to your wallet from Ready to send.\n\nCost: a 2,000-sat network fee and a 1,000-sat deposit that stays with the tree, ${TEST_COINS}.`, [
+    Alert.alert(`Lock ${length} for a ${size}?`, `Your ${size} is locked on Bitcoin Cash for ${length} and shows above while it grows. Then send it to your wallet from Ready to send.\n\nCost: a 2,000-sat network fee and a 1,000-sat deposit that stays with the tree, ${currencyDisclosure}.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Lock', onPress: () => run('plant', { action: 'plant', units: chosen.minUnits, tier, species }) },
     ]);
@@ -62,7 +63,7 @@ export const RewardActions = nativeAware(function RewardActions() {
   }
   function confirmSend(commitment: string, name: string) {
     void Haptics.selectionAsync();
-    Alert.alert(`Send ${name} to your wallet?`, `It goes to ${destination(commitment)}. Trees in your wallet can't be merged.\n\nCost: a 2,000-sat network fee, ${TEST_COINS}.`, [
+    Alert.alert(`Send ${name} to your wallet?`, `It goes to ${destination(commitment)}. Trees in your wallet can't be merged.\n\nCost: a 2,000-sat network fee, ${currencyDisclosure}.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Send', onPress: () => run(commitment, { action: 'claim', commitment }) },
     ]);
@@ -99,10 +100,12 @@ export const RewardActions = nativeAware(function RewardActions() {
       {matured.length ? <Row title="Check again" icon={icons.refresh} value={working === 'check' ? 'Checking…' : undefined} disabled={!enabled} onPress={check} /> : null}
     </Group> : null}
 
-    {rewards.account && !rewards.pending ? <Group title="Fees" footer="Paid in free test coins with no cash value: 2,000 sats per transaction, plus a 1,000-sat deposit that stays with each tree.">
-      {rewards.data.state === 'connected' ? <Row title="Fee credit" value={`${rewards.data.creditSatoshis.toLocaleString()} sats`} /> : null}
+    {rewards.account && !rewards.pending ? <Group title="Fees" footer={`Paid ${currencyDisclosure}. Each transaction costs 2,000 sats. A 1,000-sat deposit stays with each tree.`}>
+      {rewards.data.state === 'connected' ? <Row title={isMainnet ? "Available BCH" : "Fee credit"} value={`${rewards.data.creditSatoshis.toLocaleString()} sats`} /> : null}
+      {isMainnet ? <Row title="Fund your app wallet from Profile" onPress={() => router.push('/profile')} chevron /> : <>
       <Row title="Get credit for planting" value={working === 'credit-plant' ? 'Getting…' : undefined} disabled={!enabled} onPress={() => run('credit-plant', { action: 'credit-plant' })} chevron />
       <Row title="Get credit for sending" value={working === 'credit-claim' ? 'Getting…' : undefined} disabled={!enabled} onPress={() => run('credit-claim', { action: 'credit-claim' })} chevron />
+      </>}
     </Group> : null}
   </>;
 });

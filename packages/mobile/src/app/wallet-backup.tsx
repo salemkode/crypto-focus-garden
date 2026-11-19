@@ -1,3 +1,4 @@
+import { internalWalletKey } from '../services/network';
 import { useEffect, useRef, useState } from 'react';
 import { AppState, Platform, Text, View } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
@@ -40,7 +41,7 @@ export default function WalletBackupScreen() {
       }
       const unlocked = await LocalAuthentication.authenticateAsync({ promptMessage: 'Unlock your Focus Garden backup', cancelLabel: 'Cancel', disableDeviceFallback: false });
       if (!unlocked.success || !active.current || AppState.currentState !== 'active') { setState('hidden'); return; }
-      const backup = rewards.account.kind === 'foundation' ? await SecureStore.getItemAsync('focusgarden.chipnet.internal.v1') : await readRecoveryPhrase();
+      const backup = rewards.account.kind === 'foundation' ? await SecureStore.getItemAsync(internalWalletKey) : await readRecoveryPhrase();
       if (!backup) { setNotice('The original backup is unavailable. No key has been replaced.'); setState('hidden'); return; }
       if (!active.current || AppState.currentState !== 'active') return;
       setSecret(backup); setState('visible');

@@ -1,3 +1,4 @@
+import { currencyDisclosure } from '../services/network';
 import { useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -32,7 +33,7 @@ export default function MergeScreen() {
 
   function confirm(code: number, ingredients: string[], result: string, source: string) {
     void Haptics.selectionAsync();
-    Alert.alert(`Merge into a ${result.toLowerCase()}?`, `${ingredients.length} ${source.toLowerCase()}s become one ${result.toLowerCase()}, which shows up in Verified trees. Your verified focus score stays the same. This can't be undone.\n\nCost: a 2,000-sat network fee, in test coins with no cash value.`, [
+    Alert.alert(`Merge into a ${result.toLowerCase()}?`, `${ingredients.length} ${source.toLowerCase()}s become one ${result.toLowerCase()}, which shows up in Verified trees. Your verified focus score stays the same. This can't be undone.\n\nCost: a 2,000-sat network fee, ${currencyDisclosure}.`, [
       { text: 'Not now', style: 'cancel' },
       { text: 'Merge', onPress: () => {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

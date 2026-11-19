@@ -1,3 +1,5 @@
+import type { GardenNetwork } from '@focus-garden/protocol';
+import { addressPrefix, clientNetwork, clientPrefix } from '../services/network';
 import { sha256 } from "@noble/hashes/sha256";
 import { ripemd160 } from "@noble/hashes/ripemd160";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
@@ -65,7 +67,7 @@ const prefixValues = (prefix: string) =>
   [...prefix].map((char) => char.charCodeAt(0) & 31).concat(0);
 export function addressFromPublicKey(
   publicKey: Uint8Array,
-  prefix = "bchtest",
+  prefix = clientPrefix,
 ) {
   const hash = ripemd160(sha256(publicKey));
   const payload = convert([0, ...hash], 8, 5, true);
@@ -79,13 +81,13 @@ export function addressFromPublicKey(
   );
   return `${prefix}:${[...payload, ...check].map((value) => alphabet[value]).join("")}`;
 }
-export function parseRewardAddress(address: string) {
+export function parseRewardAddress(address: string, network: GardenNetwork = clientNetwork) {
   if (address !== address.toLowerCase() && address !== address.toUpperCase())
     throw new Error("Use an address with consistent casing");
   const normalized = address.toLowerCase();
   const [prefix, encoded, extra] = normalized.split(":");
-  if (extra || prefix !== "bchtest" || !encoded || encoded.length !== 42)
-    throw new Error("Use a full Chipnet address that starts with bchtest:");
+  if (extra || prefix !== addressPrefix(network) || !encoded || encoded.length !== 42)
+    throw new Error(`Use a full address that starts with ${addressPrefix(network)}:`);
   const values = [...encoded].map((char) => alphabet.indexOf(char));
   if (
     values.some((value) => value < 0) ||
@@ -100,10 +102,10 @@ export function parseRewardAddress(address: string) {
     lockingBytecode: `76a914${bytesToHex(Uint8Array.from(data.slice(1)))}88ac`,
   };
 }
-export function publicWallet(privateKey: string) {
+export function publicWallet(privateKey: string, network: GardenNetwork = clientNetwork) {
   const publicKey = secp256k1.getPublicKey(hexToBytes(privateKey));
   return {
     publicKey: bytesToHex(publicKey),
-    address: addressFromPublicKey(publicKey),
+    address: addressFromPublicKey(publicKey, addressPrefix(network)),
   };
 }

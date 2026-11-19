@@ -1,3 +1,5 @@
+import type { GardenNetwork } from '@focus-garden/protocol';
+import { parseRewardAddress } from '../../wallet/address';
 import { decodeCashAddress, encodeCashAddress } from '@bitauth/libauth';
 
 /**
@@ -6,6 +8,14 @@ import { decodeCashAddress, encodeCashAddress } from '@bitauth/libauth';
  * Chipnet address of the same key. Only key (P2PKH) addresses can receive reward NFTs.
  */
 export function chipnetAddress(address: string): string {
+  return linkedAddress(address, 'chipnet');
+}
+
+export function linkedAddress(address: string, network: GardenNetwork) {
+  if (network === 'mainnet') {
+    const text = address.trim();
+    return parseRewardAddress(text.includes(':') ? text : `bitcoincash:${text}`, network).address;
+  }
   const text = address.trim().toLowerCase();
   const candidates = text.includes(':') ? [text] : [`bitcoincash:${text}`, `bchtest:${text}`];
   for (const candidate of candidates) {
@@ -18,9 +28,10 @@ export function chipnetAddress(address: string): string {
 }
 
 /** A CAIP-10 account from WalletConnect: `bch:bchtest:bchtest:qq…`, or `bch:bchtest:qq…`. */
-export function addressFromAccount(account: string): string | null {
+export function addressFromAccount(account: string, network: GardenNetwork = 'chipnet'): string | null {
   const parts = account.split(':');
   if (parts[0] !== 'bch' || parts.length < 3) return null;
+  if (network === 'mainnet' && parts[1] !== 'bitcoincash') return null;
   const rest = parts.slice(2).join(':');
-  try { return chipnetAddress(rest); } catch { return null; }
+  try { return linkedAddress(rest, network); } catch { return null; }
 }

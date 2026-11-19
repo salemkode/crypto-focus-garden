@@ -1,3 +1,4 @@
+import { clientNetwork, clientPrefix } from './network';
 import { z } from "zod";
 import { TREE_COMMITMENT } from "@focus-garden/protocol/forest";
 
@@ -13,7 +14,7 @@ const session = z.object({
   state: z.enum(["confirming", "locked", "claimable", "claimed", "claiming", "merging", "transferred"]),
 });
 export const gardenSchema = z.object({
-  network: z.literal("chipnet"),
+  network: z.literal(clientNetwork),
   minimumConfirmations: z.number().int().min(2).max(144).default(6),
   creditSatoshis: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   sessions: z.array(session),
@@ -54,7 +55,7 @@ export async function loadGarden(
   };
 }
 
-const cacheIdentity = z.object({ address: z.string().startsWith('bchtest:'), category: z.string().regex(/^[0-9a-f]{64}$/), checkpointHash: z.string().regex(/^[0-9a-f]{64}$/) });
+const cacheIdentity = z.object({ address: z.string().startsWith(`${clientPrefix}:`), category: z.string().regex(/^[0-9a-f]{64}$/), checkpointHash: z.string().regex(/^[0-9a-f]{64}$/) });
 export const cachedGardenSchema = z.object({ checkedAt: z.number().int().positive(), garden: gardenSchema });
 export function gardenCacheKey(identity: z.input<typeof cacheIdentity>) {
   const parsed = cacheIdentity.safeParse(identity);

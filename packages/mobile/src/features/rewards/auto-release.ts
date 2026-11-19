@@ -1,3 +1,4 @@
+import { clientNetwork } from '../../services/network';
 import { z } from 'zod';
 import { parseTree } from '@focus-garden/protocol/forest';
 
@@ -17,7 +18,7 @@ export const PLANT_WINDOW_MS = 15 * 60 * 1000;
 
 export const consentSchema = z.object({
   id: z.string().min(1),
-  network: z.literal('chipnet'),
+  network: z.literal(clientNetwork),
   /** Locking bytecode (hex) of the user's linked wallet: the only allowed destination. */
   recipientBytecode: z.string().regex(/^[0-9a-f]+$/),
   units: z.number().int().positive(),
@@ -32,7 +33,7 @@ export const consentsSchema = z.array(consentSchema);
 export interface ReleasableSession { commitment: string; state: string; plantedAt: number }
 
 export function newConsent(input: { id: string; recipientBytecode: string; units: number; approvedAt: number }): ReleaseConsent {
-  return consentSchema.parse({ ...input, recipientBytecode: input.recipientBytecode.toLowerCase(), network: 'chipnet', feeCeilingSats: RELEASE_FEE_CEILING_SATS, usedFor: null });
+  return consentSchema.parse({ ...input, recipientBytecode: input.recipientBytecode.toLowerCase(), network: clientNetwork, feeCeilingSats: RELEASE_FEE_CEILING_SATS, usedFor: null });
 }
 
 /** The next tree to release and the consent that covers it, or null. One at a time. */

@@ -1,17 +1,19 @@
+import { activeWalletKey, isMainnet, networkStorageKey } from '../../services/network';
 import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import * as Data from 'effect/Data';
 import { loadInternalWallet } from '../../wallet/internal';
 import { parseRewardAddress } from '../../wallet/address';
 import { readNativeWalletIdentity } from '../wallet/wallet';
-import { beginOperation, rebroadcastSaved, resumeSavedRequest, finishPreparedOperation, recoverOperation, savedOperation, saveServiceCredential } from '../../services/transactions';
+import { beginOperation, cancelSavedPreparation, rebroadcastSaved, resumeSavedRequest, finishPreparedOperation, recoverOperation, savedOperation, saveServiceCredential } from '../../services/transactions';
 import { z } from 'zod';
 import Storage from 'expo-sqlite/kv-store';
 import { AppState } from 'react-native';
 import { cachedGardenSchema, gardenCacheKey, loadGarden } from '../../services/garden';
 import { consentsSchema, newConsent, nextRelease, RELEASE_FEE_CEILING_SATS, spendConsent, type ReleaseConsent } from './auto-release';
 
-const CONSENTS_KEY = 'focusgarden.autorelease.v1';
+const CONSENTS_KEY = networkStorageKey('focusgarden.autorelease.v1');
+const recipientKey = networkStorageKey('focusgarden.reward.chipnet');
 function readConsents(): ReleaseConsent[] {
   try { return consentsSchema.parse(JSON.parse(Storage.getItemSync(CONSENTS_KEY) ?? '[]')); } catch { return []; }
 }
@@ -23,7 +25,7 @@ function writeConsents(consents: ReleaseConsent[]) {
 
 class GardenWalletError extends Data.TaggedError('GardenWalletError')<{ message: string }> {}
 async function readAppAccount() {
-  const selected = Storage.getItemSync('focusgarden.active.wallet.v1');
+  const selected = Storage.getItemSync(activeWalletKey);
   if (selected === 'xo') {
     const native = await readNativeWalletIdentity();
     if (!native) throw new GardenWalletError({ message: 'The selected XO wallet is unavailable. Its identity has not been replaced.' });
@@ -69,10 +71,10 @@ function useRewardStore() {
     setStatus('opening');
     try {
       const appAccount = await readAppAccount();
-      const saved = await SecureStore.getItemAsync('focusgarden.reward.chipnet');
+      const saved = await SecureStore.getItemAsync(recipientKey);
       // Prefer an existing foundation account; never replace either vault.
       setPending(savedOperation());
-      if (appAccount) Storage.setItemSync('focusgarden.active.wallet.v1', appAccount.kind);
+      if (appAccount) Storage.setItemSync(activeWalletKey, appAccount.kind);
       setAccount(appAccount);
       setRecipient(saved ? parseRewardAddress(saved).address : '');
       const cacheKey = appAccount ? gardenCacheKey({ address: appAccount.address, category: process.env.EXPO_PUBLIC_GARDEN_CATEGORY ?? '', checkpointHash: process.env.EXPO_PUBLIC_GARDEN_CHECKPOINT_HASH ?? '' }) : null;
@@ -104,7 +106,7 @@ function useRewardStore() {
       if ([raw?.address, xo?.address].some((address) => address && parseRewardAddress(address).lockingBytecode === parsed.lockingBytecode)) {
         throw new GardenWalletError({ message: 'Use a separate external wallet for rewards, not either on-device app account.' });
       }
-      await SecureStore.setItemAsync('focusgarden.reward.chipnet', parsed.address);
+      await SecureStore.setItemAsync(recipientKey, parsed.address);
       setRecipient(parsed.address);
       setData({ state: 'unconfigured' });
       setNotice('Wallet linked. Trees planted before keep their original destination.');
@@ -158,11 +160,11 @@ function useRewardStore() {
     if (mutation.current || savedOperation()) throw new GardenWalletError({ message: 'Finish the saved operation before changing app wallets.' });
     const identity = kind === 'foundation' ? await loadInternalWallet() : await readNativeWalletIdentity();
     if (!identity) throw new GardenWalletError({ message: 'That wallet has not been created or restored in this installation.' });
-    Storage.setItemSync('focusgarden.active.wallet.v1', kind);
+    Storage.setItemSync(activeWalletKey, kind);
     setAccount({ address: identity.address, kind });
     setData({ state: 'unconfigured' }); setFreshness('unknown');
   }
-  async function transact(input: { action: 'credit-plant' | 'credit-claim' | 'credit-merge' | 'credit-register' | 'recover' | 'resume' | 'rebroadcast' | 'finish' } | { action: 'plant'; units: number; tier: number; species: number } | { action: 'claim'; commitment: string } | { action: 'merge'; commitments: string[] } | { action: 'register'; name: string; about: string } | { action: 'tip'; profile: string; recipient: string; amount: number } | { action: 'credential'; token: string }, beforeStart?: () => void): Promise<boolean> {
+  async function transact(input: { action: 'credit-plant' | 'credit-claim' | 'credit-merge' | 'credit-register' | 'recover' | 'resume' | 'rebroadcast' | 'finish' | 'cancel-preparation' } | { action: 'plant'; units: number; tier: number; species: number } | { action: 'claim'; commitment: string } | { action: 'merge'; commitments: string[] } | { action: 'register'; name: string; about: string } | { action: 'tip'; profile: string; recipient: string; amount: number } | { action: 'credential'; token: string }, beforeStart?: () => void): Promise<boolean> {
     if (status === 'opening' || status === 'error') return false;
     if (!await acquire()) { setNotice('Another wallet action is still running. Try again when it finishes.'); return false; }
     try {
@@ -177,6 +179,7 @@ function useRewardStore() {
         : input.action === 'resume' ? await resumeSavedRequest()
         : input.action === 'recover' ? await recoverOperation(account.address)
         : input.action === 'finish' ? await finishPreparedOperation()
+        : input.action === 'cancel-preparation' ? await cancelSavedPreparation()
         : input.action === 'plant' ? await beginAndSign(account.address, { action: 'plant', rewardAddress: recipient, units: input.units, tier: input.tier, species: input.species })
         : input.action === 'merge' ? await beginAndSign(account.address, { action: 'merge', commitments: input.commitments })
         : input.action === 'register' ? await beginAndSign(account.address, { action: 'register', name: input.name, about: input.about })
@@ -191,6 +194,7 @@ function useRewardStore() {
         pending: 'Submission is unresolved. Check saved status; no replacement will be sent automatically.',
         reserved: 'The service has reserved this request. It needs service recovery before another operation.',
         unrecorded: 'No recorded request was found. You may explicitly resume the same saved request; it has not been repeated automatically.',
+        cancelled: 'Preparation cancelled and input reservations released.',
         seen: 'Saved operation completed. Refresh the garden for its current network status.',
       };
       setNotice(`${messages[response.state] ?? response.state}${response.confirmations !== undefined ? ` ${response.confirmations} confirmations.` : ''}${response.txid ? ` Tx: ${response.txid}` : ''}`);
@@ -211,6 +215,7 @@ function useRewardStore() {
    */
   async function plantAndRelease(input: { units: number; tier: number; species: number }): Promise<boolean> {
     if (!recipient) { setNotice('Link your wallet first.'); return false; }
+    if (isMainnet) return transact({ action: 'plant', ...input });
     const approvedAt = Date.now();
     const consent = newConsent({ id: `${approvedAt}-${Math.random().toString(36).slice(2, 8)}`, recipientBytecode: parseRewardAddress(recipient).lockingBytecode, units: input.units, approvedAt });
     return transact({ action: 'plant', ...input }, () => writeConsents([...readConsents(), consent]));
@@ -218,7 +223,7 @@ function useRewardStore() {
   // Release grown trees covered by a Plant-time consent, one at a time. Never retried: the consent
   // is spent before the claim starts, and any unresolved operation blocks the next one.
   useEffect(() => {
-    if (data.state !== 'connected' || status !== 'ready' || mutation.current || pending) return;
+    if (isMainnet || data.state !== 'connected' || status !== 'ready' || mutation.current || pending) return;
     const consents = readConsents();
     const release = nextRelease(consents, data.sessions, { networkFeeSats: RELEASE_FEE_CEILING_SATS, busy: Boolean(savedOperation()) });
     if (!release) return;

@@ -1,3 +1,4 @@
+import { currencyDisclosure, clientPrefix, isMainnet } from '../../../services/network';
 import { useEffect, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AccessibilityInfo, Alert, Text, View } from 'react-native';
@@ -22,7 +23,7 @@ import { Button, color, Field, Group, Icon, icons, nativeAware, Notice, Row, Scr
 
 const WALLET_KINDS = [{ id: 'xo', label: 'Recovery phrase' }, { id: 'foundation', label: 'Early key' }] as const;
 
-const short = (address: string) => `${address.replace('bchtest:', '').slice(0, 6)}…${address.slice(-4)}`;
+const short = (address: string) => `${address.replace(`${clientPrefix}:`, '').slice(0, 6)}…${address.slice(-4)}`;
 
 export default function ProfileScreen() {
   const rewards = useRewards();
@@ -81,7 +82,7 @@ export default function ProfileScreen() {
   const status = isPublic ? 'Public profile' : profile?.state === 'pending' ? 'Confirming profile' : 'Private';
   const fees = rewards.data.state === 'connected'
     ? `Focus Garden wallet: ${rewards.data.creditSatoshis.toLocaleString()} sats for network fees.`
-    : 'The Focus Garden wallet pays network fees for your trees.';
+    : isMainnet ? 'Fund this app wallet with Mainnet BCH to pay transaction fees.' : 'The Focus Garden wallet pays network fees for your trees.';
 
   return <Screen title="Profile">
     <View className="flex-row items-center gap-4">
@@ -131,7 +132,7 @@ export default function ProfileScreen() {
     </Group>
 
     <AdvancedSection />
-    <Text className="text-center text-footnote text-ink-2">Focus Garden {Constants.expoConfig?.version ?? ''} on Chipnet, the Bitcoin Cash test network</Text>
+    <Text className="text-center text-footnote text-ink-2">Focus Garden {Constants.expoConfig?.version ?? ''} on {isMainnet ? "Bitcoin Cash Mainnet" : "Chipnet, the Bitcoin Cash test network"}</Text>
   </Screen>;
 }
 
@@ -146,7 +147,7 @@ const PublicProfile = nativeAware(function PublicProfile({ initiallyOpen, displa
   // for plant, send, merge and tip, saying exactly what happens and what it costs.
   function confirmJoin() {
     const name = displayName.trim();
-    Alert.alert(`Join as ${name}?`, `Your name is written on Bitcoin Cash for everyone to see, and can't be changed later.\n\nCost: a 2,000-sat network fee, plus 1,000 sats kept in your profile card in your Focus Garden wallet, in test coins with no cash value.`, [
+    Alert.alert(`Join as ${name}?`, `Your name is written on Bitcoin Cash for everyone to see, and can't be changed later.\n\nCost: a 2,000-sat network fee, plus 1,000 sats kept in your profile card in your Focus Garden wallet, ${currencyDisclosure}.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Join', onPress: () => { void rewards.transact({ action: 'register', name, about: about.trim() }).then(onJoined); } },
     ]);

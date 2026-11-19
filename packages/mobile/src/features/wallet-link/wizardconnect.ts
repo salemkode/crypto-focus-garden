@@ -1,3 +1,4 @@
+import { clientPrefix, isMainnet } from '../../services/network';
 import { initiateDappRelay, type RelayUpdatePayload as RelayUpdate } from '@wizardconnect/core';
 import { DappConnectionManager } from '@wizardconnect/dapp';
 import { addressFromPublicKey } from '../../wallet/address';
@@ -14,7 +15,7 @@ const KEY_EXCHANGE_WINDOW = 29_000;
  * trees go. Focus Garden only needs that address, so the session ends once it is known.
  */
 export function startWizardConnect(): Pairing {
-  const manager = new DappConnectionManager('Focus Garden', 'https://focus.salemkode.com/icon.png', { session: false });
+  const manager = new DappConnectionManager('Focus Garden', 'https://focusgarden.salemkode.com/blaze/icon.png', { session: false });
   // The library sends dapp_ready only if the wallet finishes the key exchange within 30 seconds of
   // connecting. People switch apps, scan or paste more slowly than that, so when the exchange
   // completes later, replay the last "connected" status to send dapp_ready then.
@@ -38,9 +39,15 @@ export function startWizardConnect(): Pairing {
   };
   const result = new Promise<{ address: string; walletName: string; method: 'wizardconnect' }>((resolve, reject) => {
     manager.once('walletready', () => {
+      const receivePaths = manager.getSessionPaths().filter((path) => path.name === 'receive');
+      if (isMainnet && (receivePaths.length !== 1 || !receivePaths[0].xpub.startsWith('xpub'))) {
+        reject(new Error('Switch the connected wallet to Bitcoin Cash Mainnet.'));
+        close('Mainnet receive branch required.');
+        return;
+      }
       const publicKey = manager.getPubkey(RECEIVE, 0n);
       if (!publicKey) { reject(new Error('The wallet did not share a receive address.')); close('No receive address.'); return; }
-      resolve({ address: addressFromPublicKey(publicKey, 'bchtest'), walletName: manager.walletName || 'your wallet', method: 'wizardconnect' });
+      resolve({ address: addressFromPublicKey(publicKey, clientPrefix), walletName: manager.walletName || 'your wallet', method: 'wizardconnect' });
       close('Linked to Focus Garden.');
     });
     manager.once('disconnect', (_reason, message) => { reject(new Error(message || 'The wallet closed the connection.')); close(); });

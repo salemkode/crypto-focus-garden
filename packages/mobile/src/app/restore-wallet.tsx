@@ -1,3 +1,4 @@
+import { internalWalletKey, activeWalletKey } from '../services/network';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { AppState, Text } from 'react-native';
@@ -32,8 +33,8 @@ export default function RestoreWalletScreen() {
     setStatus('saving'); setNotice('');
     try {
       if (kind === 'xo') await restoreNativeWallet(validated.data);
-      else await restoreRawWallet(validated.data, { read: () => SecureStore.getItemAsync('focusgarden.chipnet.internal.v1'), save: (key) => SecureStore.setItemAsync('focusgarden.chipnet.internal.v1', key, { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY }) });
-      Storage.setItemSync('focusgarden.active.wallet.v1', kind);
+      else await restoreRawWallet(validated.data, { read: () => SecureStore.getItemAsync(internalWalletKey), save: (key) => SecureStore.setItemAsync(internalWalletKey, key, { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY }) });
+      Storage.setItemSync(activeWalletKey, kind);
       await rewards.open();
       setPhrase('');
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

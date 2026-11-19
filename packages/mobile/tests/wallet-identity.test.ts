@@ -23,3 +23,12 @@ test('invalid recovery material, malformed addresses and mainnet addresses fail 
   const mainnet = assertSuccess(privateKeyToP2pkhCashAddress({ privateKey: key })).address;
   assert.throws(() => readStoredWalletIdentity(phrase, () => mainnet), /invalid/);
 });
+test('an identical recovery phrase can only read the cache for its selected network', () => {
+  const mainnet = assertSuccess(privateKeyToP2pkhCashAddress({ privateKey: key })).address;
+  const data = new Map([[walletAddressCacheKey(phrase, 'chipnet'), address]]);
+  const read = (cacheKey: string) => data.get(cacheKey) ?? null;
+  assert.equal(readStoredWalletIdentity(phrase, read, 'mainnet'), null);
+  data.set(walletAddressCacheKey(phrase, 'mainnet'), mainnet);
+  assert.equal(readStoredWalletIdentity(phrase, read, 'mainnet')?.address, mainnet);
+  assert.equal(readStoredWalletIdentity(phrase, read, 'chipnet')?.address, address);
+});

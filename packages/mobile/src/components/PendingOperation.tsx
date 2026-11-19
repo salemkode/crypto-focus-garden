@@ -1,3 +1,4 @@
+import { currencyDisclosure, isMainnet } from '../services/network';
 import { useState } from 'react';
 import { Alert } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
@@ -28,27 +29,35 @@ export const PendingOperation = nativeAware(function PendingOperation() {
   const saved = rewards.pending;
   if (!saved) return null;
   const intent = saved.intent;
-  const destination = intent?.action === 'plant' ? intent.rewardAddress
+  const destination = intent?.action === 'tip' ? intent.recipient
+    : intent?.action === 'plant' ? intent.rewardAddress
     : intent?.action === 'claim' ? rewardAddressOf(parseTree(intent.commitment)!.ownerBytecode)
     : intent?.action === 'merge' ? rewardAddressOf(parseTree(intent.commitments[0])!.ownerBytecode) : '';
   const label = intent?.action === 'plant' ? 'Planting a tree'
     : intent?.action === 'claim' ? 'Sending a tree to your wallet'
     : intent?.action === 'merge' ? `Merging ${intent.commitments.length} trees`
-    : intent?.action === 'register' ? 'Joining the leaderboard'
+    : intent?.action === 'register' ? `Joining the leaderboard as ${intent.name}`
     : intent?.action === 'tip' ? 'Sending a tip'
     : saved.creditAction ? `Getting fee credit for ${CREDIT[saved.creditAction]}` : 'Getting fee credit';
   // What signing spends, in the same words as the confirmations elsewhere (fees from the service's fixed policy).
-  const cost = intent?.action === 'tip' ? `${intent.amount.toLocaleString()} sats to them and a 2,000-sat network fee`
-    : intent?.action === 'plant' ? 'a 2,000-sat network fee and a 1,000-sat deposit that stays with the tree' : 'a 2,000-sat network fee';
+  const cost = intent?.action === 'tip' ? `${intent.amount.toLocaleString()} sats and a 2,000-sat network fee`
+    : intent?.action === 'plant' ? 'a 2,000-sat network fee and a 1,000-sat deposit that stays with the tree'
+    : intent?.action === 'register' ? 'a 2,000-sat network fee and a 1,000-sat deposit that stays with the leaderboard card' : 'a 2,000-sat network fee';
   // One confirm before anything is signed or sent; the row and its guards are unchanged.
   function confirmFinish() {
     void Haptics.selectionAsync();
-    Alert.alert(saved!.raw ? 'Submit this transaction?' : 'Sign and submit?', `${label}. Your Focus Garden wallet ${saved!.raw ? 'sends the transaction it already signed' : 'signs the saved transaction and sends it'} to Bitcoin Cash. ${destination ? `Goes to ${shortAddress(destination)}. ` : ''}Cost: ${cost}, in test coins with no cash value.`, [
+    Alert.alert(saved!.raw ? 'Submit this transaction?' : 'Sign and submit?', `${label}. Your Focus Garden wallet ${saved!.raw ? 'sends the transaction it already signed' : 'signs the saved transaction and sends it'} to Bitcoin Cash. ${destination ? `Goes to ${isMainnet ? destination : shortAddress(destination)}. ` : ''}Cost: ${cost}, ${currencyDisclosure}.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: saved!.raw ? 'Submit' : 'Sign and submit', onPress: () => void rewards.transact({ action: 'finish' }) },
     ]);
   }
   // Same rows and guards as before. "Sign and submit" is only shown when it can ever be enabled (it needs an id and an intent).
+  function confirmCancel() {
+    Alert.alert('Cancel this preparation?', 'This releases the reserved inputs through Focus Garden. A signed copy held outside this app can still be sent separately.', [
+      { text: 'Keep preparation', style: 'cancel' },
+      { text: 'Cancel preparation', style: 'destructive', onPress: () => void rewards.transact({ action: 'cancel-preparation' }) },
+    ]);
+  }
   const next = !saved.id ? 'resume' : intent ? 'finish' : 'check';
   const resume = <Row title="Resume the same request" disabled={!enabled} onPress={() => rewards.transact({ action: 'resume' })} chevron />;
   const finish = <Row title={saved.raw ? 'Submit saved transaction' : 'Sign and submit saved transaction'} disabled={!enabled || !saved.intent || !saved.id} onPress={confirmFinish} chevron />;
@@ -62,6 +71,7 @@ export const PendingOperation = nativeAware(function PendingOperation() {
     <Row title={more ? 'Fewer options' : 'More options'} onPress={() => setMore(!more)} chevron={!more} />
     {more && next !== 'check' ? check : null}
     {more && saved.id ? rebroadcast : null}
+    {more && isMainnet && saved.id && saved.intent && !saved.raw ? <Row title="Cancel unsubmitted preparation" disabled={!enabled} onPress={confirmCancel} chevron /> : null}
     {more && destination && next !== 'finish' ? <Row title="Goes to" detail={destination} /> : null}
   </Group>;
 });
@@ -79,7 +89,7 @@ const OUTCOMES: Record<string, { text: string; tone: 'info' | 'warning' | 'error
   'Wallet linked. Trees planted before keep their original destination.': { text: 'Wallet linked. Trees planted before still go to the wallet they were planted for.', tone: 'info' },
   'Service access saved securely. Refresh your garden to verify this app wallet.': { text: 'Access key saved. Refresh to check your Focus Garden wallet.', tone: 'info' },
   // Failures with a fix in the app: say where it is.
-  'Transaction credit is required.': { text: 'You need fee credit first. Get it under Fees in Verified trees.', tone: 'error' },
+  'Transaction credit is required.': { text: isMainnet ? 'Add Mainnet BCH to your Focus Garden wallet. Open Profile for its receive address.' : 'You need fee credit first. Get it under Fees in Verified trees.', tone: 'error' },
   'Save your service access token in Wallet first.': { text: 'Add your garden access key first, in Profile under Advanced.', tone: 'error' },
   'Submission is unresolved. Check saved status; no replacement will be sent automatically.': { text: "It isn't clear yet whether this was sent. Check status; nothing is sent again on its own.", tone: 'warning' },
 };

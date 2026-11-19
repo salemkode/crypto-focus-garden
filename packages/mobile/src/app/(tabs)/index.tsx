@@ -1,3 +1,4 @@
+import { isMainnet } from '../../services/network';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import { AccessibilityInfo, Alert, Platform, Pressable, Text, View } from 'react-native';
@@ -97,12 +98,20 @@ export default function FocusScreen() {
 
   function start() {
     if (!canPlant) return;
+    if (verified && isMainnet) {
+      Alert.alert('Plant on Bitcoin Cash Mainnet?', 'This spends a 2,000-sat network fee and locks a 1,000-sat deposit with the tree. When the tree matures, you can send it to your linked wallet from Verified trees. You will approve the separate 2,000-sat network fee before sending.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Plant with Mainnet BCH', onPress: runPlant },
+      ]);
+      return;
+    }
+    runPlant();
+  }
+
+  function runPlant() {
     setConfirmingGiveUp(false);
     plant();
     const units = Math.floor(garden.duration / 512);
-    // The Plant tap approves the whole verified session: lock it now, and send the grown tree to
-    // the linked wallet automatically when the lock matures. A background refresh delays it; it
-    // never drops it silently.
     if (verified && units >= 1) {
       const tierCode = ['sprout', 'tree', 'bigTree', 'house'].indexOf(tierForSeconds(units * 512)) + 1;
       setOnChain('sending');

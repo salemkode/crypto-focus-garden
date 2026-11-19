@@ -15,6 +15,14 @@ import {
 const privateKey = "01".repeat(32);
 const wallet = publicWallet(privateKey);
 describe("native CashAddr boundary", () => {
+  test("derives Mainnet addresses and refuses either network's address in the other mode", () => {
+    const mainnet = publicWallet(privateKey, "mainnet");
+    expect(mainnet.address).toStartWith("bitcoincash:");
+    expect(parseRewardAddress(mainnet.address, "mainnet").lockingBytecode)
+      .toBe(parseRewardAddress(wallet.address, "chipnet").lockingBytecode);
+    expect(() => parseRewardAddress(wallet.address, "mainnet")).toThrow();
+    expect(() => parseRewardAddress(mainnet.address, "chipnet")).toThrow();
+  });
   test("agrees with libauth without importing it into the mobile runtime", () => {
     const publicKey = secp256k1.derivePublicKeyCompressed(
       hexToBytes(privateKey),

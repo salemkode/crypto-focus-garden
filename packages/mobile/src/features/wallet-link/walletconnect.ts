@@ -1,8 +1,9 @@
+import { clientNetwork, isMainnet } from '../../services/network';
 // Must load before the WalletConnect client: crypto, text encoding and storage for React Native.
 import '@walletconnect/react-native-compat';
 import NetInfo from '@react-native-community/netinfo';
 import { SignClient } from '@walletconnect/sign-client';
-import { addressFromAccount, chipnetAddress } from './address';
+import { addressFromAccount, linkedAddress } from './address';
 import type { Pairing } from './wallets';
 
 import { walletConnectProjectId as projectId } from './wallets';
@@ -26,8 +27,8 @@ function signClient() {
     metadata: {
       name: 'Focus Garden',
       description: 'Grow a tree while you focus. Trees are sent to your wallet.',
-      url: 'https://focus.salemkode.com',
-      icons: ['https://focus.salemkode.com/icon.png'],
+      url: 'https://focusgarden.salemkode.com',
+      icons: ['https://focusgarden.salemkode.com/blaze/icon.png'],
       redirect: { native: 'focusgarden://' },
     },
   }).catch((cause) => { client = null; throw cause; });
@@ -43,23 +44,32 @@ export async function startWalletConnect(): Promise<Pairing> {
   const sign = await signClient();
   const { uri, approval } = await sign.connect({
     optionalNamespaces: {
-      bch: { chains: ['bch:bchtest', 'bch:bitcoincash'], methods: ['bch_getAddresses', 'bch_signTransaction', 'bch_signMessage'], events: ['addressesChanged'] },
+      bch: { chains: isMainnet ? ['bch:bitcoincash'] : ['bch:bchtest', 'bch:bitcoincash'], methods: ['bch_getAddresses', 'bch_signTransaction', 'bch_signMessage'], events: ['addressesChanged'] },
     },
   });
   if (!uri) throw new Error('WalletConnect did not return a pairing link.');
   let cancelled = false;
   const result = approval().then(async (session) => {
-    const namespace = session.namespaces.bch;
-    let address = (namespace?.accounts ?? []).map(addressFromAccount).find((value): value is string => Boolean(value));
-    if (!address) {
-      const chainId = namespace?.chains?.[0] ?? namespace?.accounts?.[0]?.split(':').slice(0, 2).join(':') ?? 'bch:bchtest';
-      const reported = await sign.request<string[]>({ topic: session.topic, chainId, request: { method: 'bch_getAddresses', params: {} } });
-      if (!reported?.[0]) throw new Error('The wallet did not share an address.');
-      address = chipnetAddress(reported[0]);
+    try {
+      const namespace = session.namespaces.bch;
+      const mainnetChain = 'bch:bitcoincash';
+      const mainnetNamespace = session.namespaces[mainnetChain];
+      const accounts = [...(namespace?.accounts ?? []), ...(isMainnet ? mainnetNamespace?.accounts ?? [] : [])];
+      let address = accounts.map((account) => addressFromAccount(account, clientNetwork)).find((value): value is string => Boolean(value));
+      if (!address) {
+        const mainnetApproved = namespace?.chains?.includes(mainnetChain) || Boolean(mainnetNamespace)
+          || accounts.some((account) => account.startsWith(`${mainnetChain}:`));
+        if (isMainnet && !mainnetApproved) throw new Error('The wallet did not approve Bitcoin Cash Mainnet.');
+        const chainId = isMainnet ? mainnetChain : namespace?.chains?.[0] ?? accounts[0]?.split(':').slice(0, 2).join(':') ?? 'bch:bchtest';
+        const reported = await sign.request<string[]>({ topic: session.topic, chainId, request: { method: 'bch_getAddresses', params: {} } });
+        if (!reported?.[0]) throw new Error('The wallet did not share an address.');
+        address = linkedAddress(reported[0], clientNetwork);
+      }
+      if (cancelled) throw new Error('Cancelled.');
+      return { address, walletName: session.peer.metadata.name || 'your wallet', method: 'walletconnect' as const };
+    } finally {
+      void sign.disconnect({ topic: session.topic, reason: { code: 6000, message: 'Focus Garden pairing ended.' } }).catch(() => undefined);
     }
-    void sign.disconnect({ topic: session.topic, reason: { code: 6000, message: 'Linked to Focus Garden.' } }).catch(() => undefined);
-    if (cancelled) throw new Error('Cancelled.');
-    return { address, walletName: session.peer.metadata.name || 'your wallet', method: 'walletconnect' as const };
   });
   return { uri, result, cancel: () => { cancelled = true; } };
 }
