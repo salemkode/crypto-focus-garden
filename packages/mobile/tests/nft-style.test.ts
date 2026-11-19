@@ -52,8 +52,8 @@ test('each NFT gets a stable name, rarity and per-item seed', () => {
   const item = nftTree(commitment);
   expect(nftTree(commitment)).toEqual(item);
   expect({ name: item.name, tag: item.tag, rarity: item.rarity, seed: item.seed }).toMatchSnapshot();
-  expect(nftTree(previewCommitment(4, 2))).toMatchObject({ name: 'Cherry House', rarity: 'epic', islandType: 'diamond' });
-  expect(nftTree(previewCommitment(3, 3))).toMatchObject({ name: 'Pine Big Tree', rarity: 'rare' });
+  expect(nftTree(previewCommitment(4, 2))).toMatchObject({ name: 'Blossom Cherry · House', rarity: 'epic', islandType: 'diamond' });
+  expect(nftTree(previewCommitment(3, 3))).toMatchObject({ name: 'Ridge Pine · Big Tree', rarity: 'rare' });
   const seeds = new Set(Array.from({ length: 50 }, (_, index) => nftTree(plant(1, 1, 1, 1_800_000_000 + index)).seed));
   expect(seeds.size).toBeGreaterThan(45);
   expect(isRewardCommitment(`04${'00'.repeat(38)}`)).toBe(false);

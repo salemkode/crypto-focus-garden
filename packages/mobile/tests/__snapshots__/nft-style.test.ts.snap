@@ -2,7 +2,7 @@
 
 exports[`each NFT gets a stable name, rarity and per-item seed 1`] = `
 {
-  "name": "Oak Tree",
+  "name": "Meadow Oak · Tree",
   "rarity": "common",
   "seed": 33604,
   "tag": "0b4d",
