@@ -1,0 +1,63 @@
+/*
+ * Leaderboard section. Uses the tokens from styles.css: sun marks what was earned
+ * (points, the top three ranks), moss marks what you can act on (the period switch).
+ */
+.leaders-layout { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: clamp(32px, 5vw, 72px); align-items: start; }
+.leaders-copy { display: grid; gap: 16px; position: sticky; top: 104px; }
+.leaders-copy p { color: var(--ink-2); font-size: 1.15rem; max-width: 44ch; }
+@media (max-width: 900px) {
+	.leaders-layout { grid-template-columns: 1fr; }
+	.leaders-copy { position: static; }
+}
+
+.leader-board { background: var(--surface); border-radius: var(--radius-panel); box-shadow: var(--shadow); padding: clamp(16px, 2.4vw, 28px); display: grid; gap: 16px; }
+
+.leader-tabs { display: inline-flex; justify-self: start; gap: 4px; padding: 4px; border-radius: 999px; background: var(--sunk); }
+.leader-tabs[hidden] { display: none; }
+.leader-tabs button {
+	min-height: 40px; padding: 0 18px; border: 0; border-radius: 999px; background: transparent;
+	color: var(--ink-2); font: 600 0.95rem/1 var(--font); cursor: pointer;
+	transition: background 0.2s var(--ease), color 0.2s var(--ease);
+}
+.leader-tabs button:hover { color: var(--ink); }
+.leader-tabs button[aria-selected="true"] { background: var(--moss); color: #fff; }
+
+.leader-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.leader {
+	display: grid; grid-template-columns: 44px minmax(0, 1fr) auto auto; align-items: center; gap: 16px;
+	padding: 14px 8px; border-top: 1px solid var(--divider);
+}
+.leader:first-child { border-top: 0; }
+.leader-rank {
+	display: grid; place-items: center; width: 40px; height: 40px; border-radius: 999px;
+	background: var(--sunk); color: var(--ink-2); font: 700 1rem/1 var(--font-round); font-variant-numeric: tabular-nums;
+}
+.leader-top .leader-rank { background: var(--sun-soft); color: var(--sun-ink); }
+.leader-who { display: grid; gap: 2px; min-width: 0; }
+.leader-name { font-weight: 680; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leader-about { color: var(--ink-2); font-size: 0.92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leader-trees { display: grid; justify-items: end; color: var(--ink-2); font-size: 0.92rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.leader-trees small { font-size: 0.82rem; }
+.leader-points { display: grid; justify-items: end; min-width: 64px; }
+.leader-points b { font: 750 1.35rem/1.1 var(--font-round); color: var(--sun-ink); font-variant-numeric: tabular-nums; }
+.leader-points small { color: var(--ink-2); font-size: 0.8rem; }
+@media (max-width: 560px) {
+	.leader { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; }
+	.leader-trees { display: none; }
+}
+
+.leader-skeleton { height: 69px; }
+.leader-skeleton::before {
+	content: ""; grid-column: 1 / -1; height: 20px; border-radius: 999px;
+	background: linear-gradient(90deg, var(--sunk) 0%, var(--divider) 50%, var(--sunk) 100%) 0 0 / 200% 100%;
+	animation: leader-shimmer 1.4s linear infinite;
+}
+@keyframes leader-shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .leader-skeleton::before { animation: none; } }
+
+.leader-empty { display: grid; justify-items: start; gap: 14px; padding: 28px 8px; color: var(--ink-2); }
+.leader-empty p { max-width: 44ch; }
+
+.leader-status { color: var(--ink-2); font-size: 0.85rem; }
+.leader-status:empty { display: none; }
+.leader-status a { color: var(--moss-text); }

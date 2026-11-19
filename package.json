@@ -27,7 +27,10 @@
 		"check": "bun run typecheck:mobile && bun run typecheck:service && bun run lint:mobile && bun run --cwd packages/mobile check:valley && bun run test",
 		"test:service": "cd packages/service && bun run test",
 		"typecheck:service": "cd packages/service && bun run typecheck",
-		"service:start": "cd packages/service && bun run start"
+		"service:start": "cd packages/service && bun run start",
+		"contracts:deploy": "cd packages/contracts && bun run deploy",
+		"landing:dev": "cd packages/landing && bun run dev",
+		"landing:build": "cd packages/landing && bun run build"
 	},
 	"dependencies": {
 		"@bch-wc2/interfaces": "^0.0.16",

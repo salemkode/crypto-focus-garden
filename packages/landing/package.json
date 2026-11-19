@@ -1,0 +1,22 @@
+{
+	"name": "@focus-garden/landing",
+	"private": true,
+	"version": "0.1.0",
+	"type": "module",
+	"scripts": {
+		"sync": "bun scripts/sync-deployment.ts",
+		"dev": "bun run sync && bun --port 4321 ./index.html",
+		"build": "bun run sync && rm -rf dist && bun build ./index.html --outdir dist --minify --splitting && cp public/icon.png dist/icon.png",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@focus-garden/garden": "workspace:*",
+		"@focus-garden/protocol": "workspace:*",
+		"three": "0.181.1"
+	},
+	"devDependencies": {
+		"@phosphor-icons/core": "^2.1.1",
+		"@types/three": "^0.181.0",
+		"typescript": "^5.7.3"
+	}
+}

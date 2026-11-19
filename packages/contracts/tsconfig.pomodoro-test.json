@@ -5,6 +5,7 @@
     "test/shared.ts",
     "test/contract/PomodoroRewards.test.ts",
     "test/contract/CreditPolicy.test.ts",
-    "test/contract/FocusForest.test.ts"
+    "test/contract/FocusForest.test.ts",
+    "test/contract/Deploy.test.ts"
   ]
 }
