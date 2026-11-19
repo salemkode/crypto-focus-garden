@@ -41,8 +41,8 @@ export const WalletLink = nativeAware(function WalletLink({ onLinked }: { onLink
 
   async function saveManual() {
     setTried(true); setSaving(true);
-    const saved = await rewards.saveRecipient(draft).finally(() => setSaving(false));
-    if (!saved) return;
+    const refused = await rewards.saveRecipient(draft).finally(() => setSaving(false));
+    if (refused) return;
     setDraft(''); setManual(false);
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onLinked?.();

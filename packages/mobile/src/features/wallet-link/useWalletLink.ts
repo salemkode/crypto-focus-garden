@@ -63,8 +63,12 @@ export function useWalletLink(onLinked?: () => void) {
       }
       const linked = await pairing.result;
       if (current.current !== pairing) return;
+      // The pairing stays current until its address is saved, so a failed save is reported below
+      // instead of being mistaken for a cancelled pairing.
+      const refused = await rewards.saveRecipient(linked.address);
+      if (refused) throw new Error(refused);
+      if (current.current !== pairing) return;
       current.current = null;
-      if (!await rewards.saveRecipient(linked.address)) throw new Error(rewards.notice || 'The linked wallet could not be saved.');
       Storage.setItemSync(LINK_INFO, JSON.stringify(linked));
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setState({ phase: 'idle' });

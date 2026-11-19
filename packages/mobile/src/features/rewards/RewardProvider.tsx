@@ -55,6 +55,16 @@ function useRewardStore() {
   const [notice, setNotice] = useState('');
   const [pending, setPending] = useState<ReturnType<typeof savedOperation>>(null);
   const mutation = useRef(false);
+  /** The background refresh in flight, if any. Wallet actions wait for it instead of being dropped. */
+  const refreshing = useRef<Promise<void> | null>(null);
+  /** Takes the one operation lock, after any running refresh finishes. False if another action holds it. */
+  async function acquire() {
+    if (mutation.current) return false;
+    mutation.current = true;
+    setStatus('busy');
+    await refreshing.current;
+    return true;
+  }
   async function open() {
     setStatus('opening');
     try {
@@ -81,10 +91,11 @@ function useRewardStore() {
     }
   }
   useEffect(() => { void open(); }, []);
-  /** Links the user's wallet. Returns whether it was saved. */
-  async function saveRecipient(draft: string): Promise<boolean> {
-    if (status !== 'ready') return false;
-    setStatus('busy');
+  /** Links the user's wallet. Resolves to null once saved, or to the reason it was not (also shown as the notice). */
+  async function saveRecipient(draft: string): Promise<string | null> {
+    const refuse = (reason: string) => { setNotice(reason); return reason; };
+    if (status === 'opening' || status === 'error') return refuse('Your wallets are not open yet. Reopen the app to try again.');
+    if (!await acquire()) return refuse('Another wallet action is still running. Try again when it finishes.');
     try {
       if (savedOperation()) throw new GardenWalletError({ message: 'Finish the saved operation before changing your reward address.' });
       const parsed = parseRewardAddress(draft.trim());
@@ -97,20 +108,20 @@ function useRewardStore() {
       setRecipient(parsed.address);
       setData({ state: 'unconfigured' });
       setNotice('Wallet linked. Trees planted before keep their original destination.');
-      return true;
-    } catch (cause) { setNotice(cause instanceof Error ? cause.message : 'Could not link that wallet.'); return false; }
-    finally { setStatus('ready'); }
+      return null;
+    } catch (cause) { return refuse(cause instanceof Error ? cause.message : 'Could not link that wallet.'); }
+    finally { mutation.current = false; setStatus('ready'); }
   }
   const accountRef = useRef(account);
   accountRef.current = account;
   const [checkedAt, setCheckedAt] = useState<number | null>(null);
   const [freshness, setFreshness] = useState<'unknown' | 'current' | 'stale'>('unknown');
-  async function refresh() {
+  function refresh(): Promise<void> {
+    if (refreshing.current) return refreshing.current;
     const current = accountRef.current;
-    if (!current || mutation.current) return;
-    mutation.current = true;
+    if (!current || mutation.current) return Promise.resolve();
     setStatus('busy');
-    try {
+    async function load(current: NonNullable<typeof account>) { try {
       const next = await loadGarden(current.address);
       if (next.state === 'connected') {
         const time = Date.now();
@@ -123,7 +134,14 @@ function useRewardStore() {
       setFreshness(next.state === 'connected' ? 'current' : 'unknown');
       setNotice('');
     } catch (cause) { setFreshness('stale'); setNotice(cause instanceof Error ? cause.message : 'Could not refresh your garden.'); }
-    finally { mutation.current = false; setStatus('ready'); }
+    finally {
+      // A wallet action queued behind this refresh keeps the busy state until it finishes.
+      if (!mutation.current) setStatus('ready');
+    } }
+    const run = load(current);
+    refreshing.current = run;
+    void run.finally(() => { if (refreshing.current === run) refreshing.current = null; });
+    return run;
   }
   useEffect(() => {
     if (!account) return;
@@ -136,6 +154,7 @@ function useRewardStore() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account?.address]);
   async function selectWallet(kind: 'foundation' | 'xo') {
+    await refreshing.current;
     if (mutation.current || savedOperation()) throw new GardenWalletError({ message: 'Finish the saved operation before changing app wallets.' });
     const identity = kind === 'foundation' ? await loadInternalWallet() : await readNativeWalletIdentity();
     if (!identity) throw new GardenWalletError({ message: 'That wallet has not been created or restored in this installation.' });
@@ -143,17 +162,17 @@ function useRewardStore() {
     setAccount({ address: identity.address, kind });
     setData({ state: 'unconfigured' }); setFreshness('unknown');
   }
-  async function transact(input: { action: 'credit-plant' | 'credit-claim' | 'credit-merge' | 'credit-register' | 'recover' | 'resume' | 'rebroadcast' | 'finish' } | { action: 'plant'; units: number; tier: number; species: number } | { action: 'claim'; commitment: string } | { action: 'merge'; commitments: string[] } | { action: 'register'; name: string; about: string } | { action: 'tip'; profile: string; recipient: string; amount: number } | { action: 'credential'; token: string }) {
-    if (mutation.current || status !== 'ready') return;
-    mutation.current = true;
-    setStatus('busy');
+  async function transact(input: { action: 'credit-plant' | 'credit-claim' | 'credit-merge' | 'credit-register' | 'recover' | 'resume' | 'rebroadcast' | 'finish' } | { action: 'plant'; units: number; tier: number; species: number } | { action: 'claim'; commitment: string } | { action: 'merge'; commitments: string[] } | { action: 'register'; name: string; about: string } | { action: 'tip'; profile: string; recipient: string; amount: number } | { action: 'credential'; token: string }, beforeStart?: () => void): Promise<boolean> {
+    if (status === 'opening' || status === 'error') return false;
+    if (!await acquire()) { setNotice('Another wallet action is still running. Try again when it finishes.'); return false; }
     try {
       if (input.action === 'credential') {
         await saveServiceCredential(input.token);
         setNotice('Service access saved securely. Refresh your garden to verify this app wallet.');
-        return;
+        return true;
       }
       if (!account) throw new GardenWalletError({ message: 'Open your app wallet first.' });
+      beforeStart?.();
       const result = input.action === 'rebroadcast' ? await rebroadcastSaved()
         : input.action === 'resume' ? await resumeSavedRequest()
         : input.action === 'recover' ? await recoverOperation(account.address)
@@ -175,7 +194,8 @@ function useRewardStore() {
         seen: 'Saved operation completed. Refresh the garden for its current network status.',
       };
       setNotice(`${messages[response.state] ?? response.state}${response.confirmations !== undefined ? ` ${response.confirmations} confirmations.` : ''}${response.txid ? ` Tx: ${response.txid}` : ''}`);
-    } catch (cause) { setNotice(cause instanceof Error ? cause.message : 'The request was interrupted. Check the saved status before starting another operation.'); }
+      return true;
+    } catch (cause) { setNotice(cause instanceof Error ? cause.message : 'The request was interrupted. Check the saved status before starting another operation.'); return false; }
     finally {
       mutation.current = false;
       try { setPending(savedOperation()); setStatus('ready'); }
@@ -185,13 +205,15 @@ function useRewardStore() {
   /**
    * The Plant tap is the approval for the whole session: lock it on Bitcoin Cash now, and release
    * the grown tree to the linked wallet automatically when its lock matures (one tree, this wallet,
-   * at most the approved network fee). The consent is saved before the plant starts.
+   * at most the approved network fee). The consent is saved before the plant starts, and only once
+   * this action holds the operation lock, so a refused plant leaves no consent behind.
+   * Resolves to whether the plant was submitted.
    */
-  async function plantAndRelease(input: { units: number; tier: number; species: number }) {
-    if (!recipient) throw new GardenWalletError({ message: 'Link your wallet first.' });
-    const consent = newConsent({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, recipientBytecode: parseRewardAddress(recipient).lockingBytecode, units: input.units, approvedAt: Date.now() });
-    writeConsents([...readConsents(), consent]);
-    await transact({ action: 'plant', ...input });
+  async function plantAndRelease(input: { units: number; tier: number; species: number }): Promise<boolean> {
+    if (!recipient) { setNotice('Link your wallet first.'); return false; }
+    const approvedAt = Date.now();
+    const consent = newConsent({ id: `${approvedAt}-${Math.random().toString(36).slice(2, 8)}`, recipientBytecode: parseRewardAddress(recipient).lockingBytecode, units: input.units, approvedAt });
+    return transact({ action: 'plant', ...input }, () => writeConsents([...readConsents(), consent]));
   }
   // Release grown trees covered by a Plant-time consent, one at a time. Never retried: the consent
   // is spent before the claim starts, and any unresolved operation blocks the next one.

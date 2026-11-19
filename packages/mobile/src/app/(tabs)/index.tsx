@@ -35,7 +35,10 @@ export default function FocusScreen() {
   const size = reward.name.toLowerCase();
   const linked = Boolean(rewards.recipient);
   const canVerify = Boolean(rewards.account && linked && rewards.data.state === 'connected');
-  const verified = garden.verify && canVerify;
+  // An unresolved wallet operation blocks a new plant, so the session would not be verified.
+  const verified = garden.verify && canVerify && !rewards.pending;
+  /** What happened to this session's verified plant: only a submitted one is promised to the wallet. */
+  const [onChain, setOnChain] = useState<'sending' | 'sent' | 'failed' | null>(null);
   const [panel, setPanel] = useState(260);
   const [planning, setPlanning] = useState(false);
   const insets = useSafeAreaInsets();
@@ -95,11 +98,14 @@ export default function FocusScreen() {
     plant();
     const units = Math.floor(garden.duration / 512);
     // The Plant tap approves the whole verified session: lock it now, and send the grown tree to
-    // the linked wallet automatically when the lock matures.
-    if (verified && units >= 1 && !rewards.pending) {
+    // the linked wallet automatically when the lock matures. A background refresh delays it; it
+    // never drops it silently.
+    if (verified && units >= 1) {
       const tierCode = ['sprout', 'tree', 'bigTree', 'house'].indexOf(tierForSeconds(units * 512)) + 1;
-      void rewards.plantAndRelease({ units, tier: tierCode, species: SPECIES_CODE[garden.species] });
-    }
+      setOnChain('sending');
+      void rewards.plantAndRelease({ units, tier: tierCode, species: SPECIES_CODE[garden.species] })
+        .then((sent) => setOnChain(sent ? 'sent' : 'failed'), () => setOnChain('failed'));
+    } else setOnChain(null);
   }
 
   function confirmGiveUp() {
@@ -168,13 +174,14 @@ export default function FocusScreen() {
               <Text numberOfLines={1} className="text-footnote text-ink-2">Growing a {size} · {tag.label}{blocking ? ' · apps blocked' : ''}</Text>
             </View>
           </View>
+          {onChain === 'failed' ? <Notice tone="error">{`Not verified on Bitcoin Cash. Your ${size} still grows here.`}</Notice> : null}
           <Button variant="destructive" size="medium" label="Give up" onPress={confirmGiveUp} />
         </Animated.View> : null}
 
         {timer.status === 'grown' || timer.status === 'withered' ? <Animated.View entering={FadeIn} className="gap-4">
           <View className="gap-0.5">
             <Text accessibilityRole="header" className="text-title-3 text-ink">{timer.status === 'grown' ? `Your ${size} joined your valley` : `Your ${size} withered`}</Text>
-            <Text className="text-subhead text-ink-2">{timer.status === 'grown' ? `${formatDuration(timer.duration)} focused${verified ? '. On its way to your wallet.' : ''}` : timer.reason === 'left-app' ? 'You left the app for too long.' : 'You gave up early.'}</Text>
+            <Text className="text-subhead text-ink-2">{timer.status === 'grown' ? `${formatDuration(timer.duration)} focused${onChain === 'sent' ? '. On its way to your wallet.' : ''}` : timer.reason === 'left-app' ? 'You left the app for too long.' : 'You gave up early.'}</Text>
           </View>
           {/* Returns to the next-session summary; planting stays one deliberate tap on Plant. */}
           <Button label="Next session" onPress={dismiss} />
