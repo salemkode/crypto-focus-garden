@@ -51,7 +51,14 @@ export type TransactionStatus = { state: 'confirmed'; height: number; confirmati
 export function chainReader(request: ElectrumRequest) {
   const raws = new Map<string, string>();
   const mtps = new Map<number, number>();
-  const tipHeight = async () => z.object({ height: z.number().int().positive() }).parse(await request('blockchain.headers.get_tip')).height;
+  // Median times are cached only for blocks buried this deep below the last tip seen, so a chain
+  // reorganization can never leave a replaced block's time in the cache.
+  const SETTLED_DEPTH = 10;
+  let lastTip = 0;
+  const tipHeight = async () => {
+    lastTip = z.object({ height: z.number().int().positive() }).parse(await request('blockchain.headers.get_tip')).height;
+    return lastTip;
+  };
   return {
     async listUnspent(lockingBytecode: string): Promise<ChainCoin[]> {
       const result = unspent.parse(await request('blockchain.scripthash.listunspent', scriptHashOf(lockingBytecode), 'include_tokens'));
@@ -82,7 +89,7 @@ export function chainReader(request: ElectrumRequest) {
       if (cached !== undefined) return cached;
       const result = z.object({ hex: z.string(), count: z.number().int() }).parse(await request('blockchain.block.headers', height - 10, 11));
       const value = medianTimePast(result.hex);
-      mtps.set(height, value);
+      if (lastTip > 0 && height <= lastTip - SETTLED_DEPTH) mtps.set(height, value);
       return value;
     },
     async status(id: string): Promise<TransactionStatus> {
