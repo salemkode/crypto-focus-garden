@@ -1,12 +1,41 @@
 # Focus Garden
 
+> [!IMPORTANT]
+> 🚩 **This is an upgrade of our 2025 hackathon project.** Focus Garden started as *Crypto Focus
+> Garden*, a Next.js web dApp we built for last year's hackathon (1–23 November 2025). The original
+> submission is preserved at commit
+> [`de708cd`](https://github.com/salemkode/crypto-focus-garden/tree/de708cd), and its README is
+> [here](https://github.com/salemkode/crypto-focus-garden/blob/de708cd/README.md). Everything after
+> that commit is this year's work. See [Before and after](#before-and-after-2025-hackathon--now).
+
 Focus Garden is a focus timer that grows a tree while you stay off your phone. Leave the app and the
 tree withers. Verified sessions are locked on Bitcoin Cash, and the grown tree is sent to your own
 wallet as a collectible. Longer focus grows bigger trees (sprout, tree, big tree, house), and
 smaller ones merge into bigger ones.
 
-> Status: development on **Chipnet**, the Bitcoin Cash test network. Nothing is deployed to
-> mainnet, and test coins have no value.
+> Status: live on Bitcoin Cash **mainnet** (contracts in
+> [`packages/contracts/deployments/mainnet.json`](packages/contracts/deployments/mainnet.json)).
+> Development and testing also run on Chipnet, the test network.
+
+## Before and after (2025 hackathon → now)
+
+Last year's version proved the idea: finish a focus timer, receive a CashTokens NFT. It was a web
+page on Chipnet, and its contract skipped the real time check so the demo could mint quickly. We
+wanted a phone app, but Libauth, the library the contracts depend on, did not run on React Native.
+This year we solved that and rebuilt the product around it.
+
+| | 2025 hackathon version | Now |
+|---|---|---|
+| Platform | Web dApp (Next.js) in the browser | One Expo app for iOS, Android and web |
+| Network | Chipnet (test coins) | Bitcoin Cash mainnet |
+| Contracts | One `PomodoroRewards` contract | `FocusForest` (plant, grow, merge, claim) and `FocusDirectory` (public profiles) |
+| Time check | Relaxed for the demo | Enforced on-chain: a time lock holds the tree for the full session |
+| Staying focused | A timer on a web page | Leaving the app withers the tree; Screen Time (iOS) and usage access (Android) block chosen apps |
+| Rewards | One NFT per finished session | Trees grow by session length (sprout, tree, big tree, house), come in six styles, and merge into bigger ones |
+| Wallets | WalletConnect in the browser | Selene, Paytaca, WalletConnect, WizardConnect or a pasted address, plus an on-device wallet for fees |
+| World | A Three.js scene | A voxel valley rendered natively, shared with the web |
+| Social | None | On-chain leaderboard, public profile cards and tips |
+| Libauth on mobile | Blocked (no React Native support) | Runs natively through `libauth-native` |
 
 ## What's in the repository
 
@@ -17,7 +46,7 @@ smaller ones merge into bigger ones.
 | `packages/contracts` | CashScript contracts: `FocusForest` (locks and grows trees), `FocusDirectory` (public profiles), and the earlier `PomodoroRewards`. |
 | `packages/protocol` | Shared rules: reward sizes, tree styles and the on-chain data format. |
 | `packages/service` | The garden service that pays network fees for planting and claiming, with an operator-owned BCHN node. |
-| `packages/dapp` | The original Next.js web prototype (legacy). |
+| `packages/dapp` | The 2025 hackathon web dApp (legacy). |
 
 Inside the app:
 

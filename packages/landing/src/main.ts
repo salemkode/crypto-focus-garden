@@ -19,6 +19,7 @@ import turnLeftIcon from "@phosphor-icons/core/assets/regular/arrow-counter-cloc
 import turnRightIcon from "@phosphor-icons/core/assets/regular/arrow-clockwise.svg" with { type: "text" };
 import pauseIcon from "@phosphor-icons/core/assets/fill/pause-fill.svg" with { type: "text" };
 import playIcon from "@phosphor-icons/core/assets/fill/play-fill.svg" with { type: "text" };
+import flagIcon from "@phosphor-icons/core/assets/fill/flag-fill.svg" with { type: "text" };
 import deployment from "./deployment.json";
 import { DOWNLOADS, EXPLORER, NETWORK } from "./config";
 import { Stage } from "./stage";
@@ -31,7 +32,7 @@ const $$ = <T extends Element = HTMLElement>(selector: string, root: ParentNode 
 
 // ------------------------------------------------------------------ icons
 
-const ICONS: Record<string, string> = { timer: timerIcon, lock: lockIcon, wallet: walletIcon, plant: plantIcon, tree: treeIcon, hourglass: hourglassIcon, trophy: trophyIcon, leaf: leafIcon, "turn-left": turnLeftIcon, "turn-right": turnRightIcon, pause: pauseIcon, play: playIcon };
+const ICONS: Record<string, string> = { timer: timerIcon, lock: lockIcon, wallet: walletIcon, plant: plantIcon, tree: treeIcon, hourglass: hourglassIcon, trophy: trophyIcon, leaf: leafIcon, "turn-left": turnLeftIcon, "turn-right": turnRightIcon, pause: pauseIcon, play: playIcon, flag: flagIcon, open: openIcon };
 for (const element of $$("[data-icon]")) {
 	element.innerHTML = ICONS[element.dataset.icon!] ?? "";
 	element.setAttribute("aria-hidden", "true");

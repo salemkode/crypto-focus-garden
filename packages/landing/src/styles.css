@@ -26,6 +26,8 @@
 	--sun-soft: #fcefd2;
 	--ember: #a63a29;
 	--ember-soft: #f6e1dc;
+	--flag: #b42318;
+	--flag-soft: #fde4e1;
 	--sky-top: #cfe8ee;
 	--sky-bottom: #ffe2c2;
 	--leaf: #8fd65e;
@@ -58,6 +60,8 @@
 		--sun-soft: #352a10;
 		--ember: #f08a76;
 		--ember-soft: #3a1d17;
+		--flag: #ff8a7a;
+		--flag-soft: #3d1c18;
 		--sky-top: #22404b;
 		--sky-bottom: #4c3a2c;
 		--clay-light: rgb(255 255 255 / 0.06);
@@ -170,6 +174,10 @@ section > * { max-width: 1180px; margin-inline: auto; }
 	background: var(--sun-soft); color: var(--sun-ink); font-weight: 700; font-size: 0.92rem;
 	box-shadow: inset 0 1px 0 var(--clay-light);
 }
+.pills { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.pill-flag { background: var(--flag-soft); color: var(--flag); text-decoration: none; transition: transform 0.2s var(--ease-press); }
+.pill-flag:hover { text-decoration: underline; text-underline-offset: 3px; }
+.pill-flag:active { transform: scale(0.98); }
 .lead { font-size: clamp(1.1rem, 1.6vw, 1.3rem); color: var(--ink-2); max-width: 40ch; }
 .hero-demo { margin: clamp(40px, 5vw, 64px) auto 0; max-width: 1180px; position: relative; }
 .hero-stage {
@@ -349,6 +357,25 @@ input[type="range"]::-moz-range-thumb { width: 26px; height: 26px; border-radius
 	.shot-raised { translate: none; }
 	.extras { grid-template-columns: 1fr; }
 }
+
+/* ---------- origin: the 2025 hackathon project this upgrades */
+.origin-panel {
+	display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 40px; align-items: center;
+	padding: clamp(28px, 4vw, 56px); border-radius: 40px;
+	background: linear-gradient(160deg, var(--flag-soft), var(--surface) 55%);
+	box-shadow: inset 0 1px 0 var(--clay-light), inset 0 -2px 0 var(--clay-dark), var(--shadow);
+}
+.origin-head { display: grid; gap: 18px; justify-items: start; }
+.origin-head > p:not(.flag-tag) { color: var(--ink-2); }
+.flag-tag { display: inline-flex; align-items: center; gap: 8px; color: var(--flag); font-weight: 800; font-size: 0.92rem; }
+.origin-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.era { padding: 24px; display: grid; gap: 14px; align-content: start; }
+.era h3 { color: var(--ink-2); }
+.era-now h3 { color: var(--moss-text); }
+.era ul { margin: 0; padding: 0 0 0 1.1em; display: grid; gap: 10px; color: var(--ink-2); }
+.era-now ul { color: var(--ink); }
+@media (max-width: 900px) { .origin-panel { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .origin-compare { grid-template-columns: 1fr; } }
 
 /* ---------- faq */
 .faq h2 { margin-bottom: 32px; text-align: center; }
