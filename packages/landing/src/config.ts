@@ -1,12 +1,12 @@
 /**
  * Everything you may need to edit before publishing the page lives here.
- * Leave a link empty ("") and its button shows "Coming soon" instead of a dead link.
+ * A platform whose link is empty ("") is simply not shown.
  */
 export const DOWNLOADS = {
-	/** iPhone install link (AppDrop share link). */
+	/** iPhone install link (AppDrop share link; recipients sign with their own Apple ID). */
 	ios: "https://appdrop.app/d/prvhsh4gyx",
-	/** Android: a Play Store link or a direct .apk URL. */
-	android: "",
+	/** Android download (AppDrop share link for the release APK). */
+	android: "https://appdrop.app/d/njfetdhs4s",
 	/** Web version of the app (Expo web build). */
 	web: "https://focus-garden-app.netlify.app",
 } as const;
