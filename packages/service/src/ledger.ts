@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite';
 import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { binToHex } from '@bitauth/libauth';
-import { decode, GardenTransactionError } from '@focus-garden/protocol';
+import { decode, GardenTransactionError, type GardenNetwork } from '@focus-garden/protocol';
 
 export const operationSchema = z.object({
   id: z.string(), account: z.string(), key: z.string(), kind: z.enum(['credit', 'plant', 'claim', 'merge', 'register', 'tip']),
@@ -54,6 +54,17 @@ export class Ledger {
     }).immediate();
   }
   setting(key: string) { return z.object({ value: z.string() }).nullable().parse(this.db.query('SELECT value FROM settings WHERE key=?').get(key))?.value; }
+  bindNetwork(network: GardenNetwork) {
+    this.db.transaction(() => {
+      const existing = this.setting('network');
+      if (existing === network) return;
+      const legacyActivity = this.db.query('SELECT 1 FROM accounts UNION ALL SELECT 1 FROM wallets UNION ALL SELECT 1 FROM operations LIMIT 1').get();
+      if (existing || (network === 'mainnet' && legacyActivity)) {
+        throw new GardenTransactionError({ message: 'Use a separate ledger for this network.' });
+      }
+      this.db.run('INSERT INTO settings VALUES(?,?)', ['network', network]);
+    }).immediate();
+  }
   requireWrites() {
     if (this.setting('broadcasts.paused') === 'true') throw new GardenTransactionError({ message: 'Transaction submissions are temporarily paused. Saved operations are preserved.' });
   }

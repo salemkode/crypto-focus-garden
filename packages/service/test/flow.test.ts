@@ -16,8 +16,8 @@ const key = Uint8Array.from({ length: 32 }, (_, i) => i + 1);
 const signer = new SignatureTemplate(key);
 const external = new SignatureTemplate(key.map((value) => value + 1));
 const treasuryKey = key.map((value) => value + 2);
-function walletAddress(publicKey: Uint8Array) {
-  const result = lockingBytecodeToCashAddress({ bytecode: encodeLockingBytecodeP2pkh(hash160(publicKey)), prefix: 'bchtest' });
+function walletAddress(publicKey: Uint8Array, prefix: 'bchtest' | 'bitcoincash' = 'bchtest') {
+  const result = lockingBytecodeToCashAddress({ bytecode: encodeLockingBytecodeP2pkh(hash160(publicKey)), prefix });
   if (typeof result === 'string') throw new Error(result);
   return result.address;
 }
@@ -26,7 +26,7 @@ const rewardAddress = walletAddress(external.getPublicKey());
 const databases: Ledger[] = [];
 afterEach(() => databases.splice(0).forEach((ledger) => ledger.db.close()));
 class TestNetwork implements NetworkProvider {
-  network = 'chipnet' as const;
+  constructor(readonly network: 'chipnet' | 'mainnet' = 'chipnet') {}
   transactions = new Map<string, string>();
   coins = new Map<string, Utxo[]>();
   broadcasts = 0;
@@ -61,7 +61,7 @@ class TestNetwork implements NetworkProvider {
     this.transactions.set(txid, raw);
     this.coins.forEach((coins, address) => this.coins.set(address, coins.filter((coin) => !tx.inputs.some((input) => coin.txid === binToHex(input.outpointTransactionHash) && coin.vout === input.outpointIndex))));
     tx.outputs.forEach((output, vout) => {
-      const destination = lockingBytecodeToCashAddress({ bytecode: output.lockingBytecode, prefix: 'bchtest' });
+      const destination = lockingBytecodeToCashAddress({ bytecode: output.lockingBytecode, prefix: this.network === 'mainnet' ? 'bitcoincash' : 'bchtest' });
       if (typeof destination === 'string') return;
       const coin = { txid, vout, satoshis: output.valueSatoshis, ...(output.token ? { token: { category: binToHex(output.token.category), amount: output.token.amount, ...(output.token.nft ? { nft: { capability: output.token.nft.capability, commitment: binToHex(output.token.nft.commitment) } } : {}) } } : {}) };
       this.coins.set(destination.address, [...(this.coins.get(destination.address) ?? []), coin]);
@@ -88,13 +88,76 @@ function fixture() {
   }
   return { ledger, provider, contract, timing, rpc, prove, token };
 }
-function signPrepared(prepared: ReturnType<typeof preparedSchema.parse>) {
-  const resolved = resolvePrepared(prepared);
+function signPrepared(prepared: Parameters<typeof resolvePrepared>[0], network: 'chipnet' | 'mainnet' = 'chipnet') {
+  const resolved = resolvePrepared(prepared, network);
   const inputIndex = resolved.transaction.inputs.length - 1;
   const context = { ...resolved, inputIndex };
   context.transaction.inputs[inputIndex].unlockingBytecode = signAppWalletInput(key, context);
   return binToHex(encodeTransaction(context.transaction));
 }
+test('Mainnet plants and claims a self-funded tree while rejecting Chipnet data and sponsored credit', async () => {
+  const ledger = new Ledger(':memory:'); databases.push(ledger);
+  const provider = new TestNetwork('mainnet');
+  const chainIdentity = { genesisHash: '22'.repeat(32), checkpointHeight: 1, checkpointHash: '11'.repeat(32) };
+  const timing = { mature: false };
+  const config = { ledger, minimumConfirmations: 6, writesEnabled: true, chainIdentity, provider, category, budget: 0,
+    observe: async (txid: string) => ({ state: provider.transactions.has(txid) ? 'confirmed' as const : 'missing' as const, confirmations: 6, blockHash: '11'.repeat(32), blockTime: Date.now() }),
+    rewardHeld: async () => true, maturity: async () => timing.mature ? 'claimable' as const : 'locked' as const };
+  const oldLedger = new Ledger(':memory:'); databases.push(oldLedger);
+  oldLedger.createAccount('legacy-account');
+  expect(() => createGardenService({ ...config, ledger: oldLedger })).toThrow(/separate ledger/i);
+  const service = createGardenService(config);
+  const token = ledger.createAccount('main-account');
+  expect(() => createGardenService({ ...config, treasuryKey: encodePrivateKeyWif(treasuryKey, 'testnet') })).toThrow();
+  expect(() => createGardenService({ ...config, provider: new TestNetwork('chipnet') })).toThrow();
+  const mainWallet = walletAddress(signer.getPublicKey(), 'bitcoincash');
+  const mainReward = walletAddress(external.getPublicKey(), 'bitcoincash');
+  async function rpc(body: object, handler = service) {
+    const response = await handler(new Request('https://garden.test/v1/rpc', { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: JSON.stringify(body) }));
+    return { status: response.status, data: await response.json() };
+  }
+  expect((await rpc({ method: 'whoami' })).data.network).toBe('mainnet');
+  expect((await rpc({ method: 'challenge', wallet })).status).not.toBe(200);
+  const challenge = (await rpc({ method: 'challenge', wallet: mainWallet })).data;
+  const script = lockingBytecode(mainWallet, 'mainnet');
+  const chipnetProof = signAppWalletInput(key, ownershipContext('main-account', challenge.nonce, script));
+  const proof = { method: 'prove', wallet: mainWallet, nonce: challenge.nonce };
+  expect((await rpc({ ...proof, unlockingBytecode: binToHex(chipnetProof) })).status).toBe(409);
+  const mainProof = signAppWalletInput(key, ownershipContext('main-account', challenge.nonce, script, 'mainnet'));
+  expect((await rpc({ ...proof, unlockingBytecode: binToHex(mainProof) })).status).toBe(200);
+  const credit = { method: 'credit', action: 'plant', wallet: mainWallet, key: crypto.randomUUID() };
+  expect((await rpc(credit)).status).toBe(409);
+  provider.seed(mainWallet, 12000n);
+  const contract = contractFor(provider, category);
+  provider.seed(contract.address, 1000n, { category, amount: 0n, nft: { capability: 'minting', commitment: '' } });
+  expect((await rpc(credit)).data).toMatchObject({ state: 'funded' });
+  const plant = { method: 'prepare', wallet: mainWallet, key: crypto.randomUUID(), intent: { action: 'plant' as const, rewardAddress: mainReward, units: 3, tier: 2, species: 1 } };
+  const readOnlyService = createGardenService({ ...config, writesEnabled: false });
+  expect((await rpc(plant, readOnlyService)).status).toBe(409);
+  expect(ledger.get('main-account', plant.key)).toBeNull();
+  ledger.setControl('broadcasts.paused', true);
+  expect((await rpc(plant)).status).toBe(409);
+  expect(ledger.get('main-account', plant.key)).toBeNull();
+  ledger.setControl('broadcasts.paused', false);
+  expect((await rpc({ ...plant, intent: { ...plant.intent, rewardAddress } })).status).not.toBe(200);
+  const prepared = JSON.parse((await rpc(plant)).data.payload);
+  expect(prepared.network).toBe('mainnet');
+  expect(() => resolvePrepared(prepared)).toThrow();
+  const contractAddress = cashAddressToLockingBytecode(contract.address);
+  if (typeof contractAddress === 'string') throw new Error(contractAddress);
+  const proofPolicy = { network: 'mainnet' as const, category, contractBytecode: binToHex(contractAddress.bytecode),
+    internalBytecode: binToHex(script), rewardBytecode: binToHex(lockingBytecode(mainReward, 'mainnet')), nowSeconds: Math.floor(Date.now() / 1000) };
+  const planted = validateRewardTransaction(prepared, plant.intent, proofPolicy);
+  expect((await rpc({ method: 'submit', id: prepared.id, raw: signPrepared(prepared, 'mainnet') })).data.state).toBe('seen');
+  const claim = { ...plant, key: crypto.randomUUID(), intent: { action: 'claim' as const, commitment: planted.commitment } };
+  expect((await rpc(claim)).status).toBe(409);
+  timing.mature = true;
+  const release = JSON.parse((await rpc(claim)).data.payload);
+  validateRewardTransaction(release, claim.intent, proofPolicy);
+  expect((await rpc({ method: 'submit', id: release.id, raw: signPrepared(release, 'mainnet') })).data.state).toBe('seen');
+  expect((await provider.getUtxos(mainReward)).some((entry) => entry.token?.nft?.capability === 'none' && entry.token.nft.commitment === planted.commitment)).toBe(true);
+  expect(provider.broadcasts).toBe(2);
+});
 test('rejects unauthenticated credit, unproved wallets and replayed ownership proofs', async () => {
   const f = fixture();
   expect((await f.rpc({ method: 'challenge', wallet }, 'invalid')).status).toBe(401);

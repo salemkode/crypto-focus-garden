@@ -1,38 +1,39 @@
 import { Contract, TransactionBuilder, placeholderP2PKHUnlocker, type NetworkProvider, SignatureTemplate } from 'cashscript';
 import { binToHex, cashAddressToLockingBytecode, hexToBin, decodePrivateKeyWif, lockingBytecodeToCashAddress } from '@bitauth/libauth';
 import { z } from 'zod';
-import { address, GardenTransactionError, intentSchema, transactionId } from '@focus-garden/protocol';
+import { gardenAddress, gardenIntent, gardenNetwork, gardenPrefix, GardenTransactionError, intentSchema, transactionId, type GardenNetwork } from '@focus-garden/protocol';
 import { aboutOutputBytecode, checkMerge, parseTree, planterTag, plantedCommitment, profileCommitment, UNIT_SECONDS } from '@focus-garden/protocol/forest';
 import artifact from '../../contracts/artifacts/FocusForest.artifact';
 import directoryArtifact from '../../contracts/artifacts/FocusDirectory.artifact';
 import type { Ledger } from './ledger';
 
-export function lockingBytecode(input: string) {
-  const decoded = cashAddressToLockingBytecode(address.parse(input));
-  if (typeof decoded === 'string' || !/^76a914[0-9a-f]{40}88ac$/.test(binToHex(decoded.bytecode))) throw new GardenTransactionError({ message: 'Use a chipnet P2PKH address.' });
+export function lockingBytecode(input: string, network: GardenNetwork = 'chipnet') {
+  const decoded = cashAddressToLockingBytecode(gardenAddress(network).parse(input));
+  if (typeof decoded === 'string' || !/^76a914[0-9a-f]{40}88ac$/.test(binToHex(decoded.bytecode))) throw new GardenTransactionError({ message: 'Use a P2PKH address on the configured network.' });
   return decoded.bytecode;
 }
 export function contractFor(provider: NetworkProvider, category: string) {
   z.string().regex(/^[0-9a-f]{64}$/).parse(category);
-  if (provider.network !== 'chipnet') throw new GardenTransactionError({ message: 'Only chipnet is enabled.' });
+  gardenNetwork.parse(provider.network);
   return new Contract(artifact, [hexToBin(category).reverse()], { provider, addressType: 'p2sh32' });
 }
 export function directoryFor(provider: NetworkProvider, category: string) {
   z.string().regex(/^[0-9a-f]{64}$/).parse(category);
-  if (provider.network !== 'chipnet') throw new GardenTransactionError({ message: 'Only chipnet is enabled.' });
+  gardenNetwork.parse(provider.network);
   return new Contract(directoryArtifact, [hexToBin(category).reverse()], { provider, addressType: 'p2sh32' });
 }
 export function outpoint(coin: { txid: string; vout: number }) { return `${coin.txid}:${coin.vout}`; }
 export async function prepareReward(provider: NetworkProvider, ledger: Ledger, operation: string, account: string, wallet: string, category: string, requested: z.input<typeof intentSchema>, options: { directoryCategory?: string } = {}) {
-  const intent = intentSchema.parse(requested);
-  const internal = lockingBytecode(wallet);
+  const network = gardenNetwork.parse(provider.network);
+  const intent = gardenIntent(network).parse(requested);
+  const internal = lockingBytecode(wallet, network);
   const needed = intent.action === 'plant' ? 8000n : intent.action === 'tip' ? BigInt(intent.amount) + 2000n + 546n : 4000n;
   const funding = (await provider.getUtxos(wallet)).find((coin) => !coin.token && coin.satoshis >= needed && ledger.available(outpoint(coin)));
   if (!funding) throw new GardenTransactionError({ message: intent.action === 'tip' ? 'Your app wallet does not have enough BCH for this tip.' : 'Transaction credit is required.' });
   const builder = new TransactionBuilder({ provider });
 
   if (intent.action === 'tip') {
-    const recipient = lockingBytecode(intent.recipient);
+    const recipient = lockingBytecode(intent.recipient, network);
     if (binToHex(recipient) === binToHex(internal)) throw new GardenTransactionError({ message: 'You cannot tip yourself.' });
     ledger.reserveCoins(operation, [outpoint(funding)]);
     builder.setLocktime(0).addInput(funding, placeholderP2PKHUnlocker(wallet), { sequence: 0xffffffff })
@@ -52,7 +53,7 @@ export async function prepareReward(provider: NetworkProvider, ledger: Ledger, o
       .addInput(baton, directory.unlock.register(internal.slice(3, 23), hexToBin(card.slice(2))), { sequence: 0xffffffff })
       .addInput(funding, placeholderP2PKHUnlocker(wallet), { sequence: 0xffffffff })
       .addOutput({ to: directory.tokenAddress, amount: baton.satoshis, token: baton.token })
-      .addOutput({ to: tokenAddressOf(wallet), amount: 1000n, token: { category: options.directoryCategory, amount: 0n, nft: { capability: 'none', commitment: card } } });
+      .addOutput({ to: tokenAddressOf(wallet, network), amount: 1000n, token: { category: options.directoryCategory, amount: 0n, nft: { capability: 'none', commitment: card } } });
     if (intent.about.trim()) builder.addOpReturnOutput(['0x' + aboutOutputBytecode(intent.about).slice(4, 12), intent.about.trim()]);
     builder.addOutput({ to: wallet, amount: funding.satoshis - 3000n });
     return finish([baton, funding]);
@@ -64,7 +65,7 @@ export async function prepareReward(provider: NetworkProvider, ledger: Ledger, o
   if (intent.action === 'plant') {
     const baton = coins.find((coin) => coin.token?.category === category && coin.token.amount === 0n && coin.token.nft?.capability === 'minting' && coin.token.nft.commitment === '' && ledger.available(outpoint(coin)));
     if (!baton) throw new GardenTransactionError({ message: 'No Focus Forest minting baton is available.' });
-    const reward = lockingBytecode(intent.rewardAddress);
+    const reward = lockingBytecode(intent.rewardAddress, network);
     if (binToHex(internal) === binToHex(reward)) throw new GardenTransactionError({ message: 'Use a separate external reward wallet.' });
     // Commitments identify sessions, so two identical plantings in the same second take the next free second.
     let plantedAt = Math.floor(Date.now() / 1000);
@@ -111,7 +112,7 @@ export async function prepareReward(provider: NetworkProvider, ledger: Ledger, o
     // The merged tree keeps every ingredient's deposit; the app wallet pays only the fee.
     .addOutput({ to: contract.tokenAddress, amount: deposits, token: { category, amount: 0n, nft: { capability: 'mutable', commitment: checked.result } } })
     .addOutput({ to: wallet, amount: funding.satoshis - 2000n });
-  const reward = lockingBytecodeToAddress(parseTree(checked.result)!.ownerBytecode);
+  const reward = lockingBytecodeToAddress(parseTree(checked.result)!.ownerBytecode, network);
   ledger.db.transaction(() => {
     ledger.db.run('INSERT INTO sessions(commitment,account,wallet,reward,duration,plantedAt,plant,claim) VALUES(?,?,?,?,0,?,?,NULL)', [checked.result, account, wallet, reward, Date.now(), operation]);
     intent.commitments.forEach((commitment) => ledger.db.run('UPDATE sessions SET mergedInto=? WHERE commitment=? AND account=?', [operation, commitment, account]));
@@ -119,22 +120,23 @@ export async function prepareReward(provider: NetworkProvider, ledger: Ledger, o
   return finish([...inputs, funding]);
 
   async function finish(spent: { txid: string }[]) {
-    return { id: operation, network: 'chipnet' as const, transaction: builder.build(), sourceTransactions: await Promise.all(spent.map((coin) => provider.getRawTransaction(coin.txid))) };
+    return { id: operation, network, transaction: builder.build(), sourceTransactions: await Promise.all(spent.map((coin) => provider.getRawTransaction(coin.txid))) };
   }
 }
-function tokenAddressOf(wallet: string) {
+function tokenAddressOf(wallet: string, network: GardenNetwork) {
   const decoded = cashAddressToLockingBytecode(wallet);
   if (typeof decoded === 'string') throw new GardenTransactionError({ message: decoded });
-  const result = lockingBytecodeToCashAddress({ bytecode: decoded.bytecode, prefix: 'bchtest', tokenSupport: true });
+  const result = lockingBytecodeToCashAddress({ bytecode: decoded.bytecode, prefix: gardenPrefix(network), tokenSupport: true });
   if (typeof result === 'string') throw new GardenTransactionError({ message: result });
   return result.address;
 }
-function lockingBytecodeToAddress(bytecode: string) {
-  const result = lockingBytecodeToCashAddress({ bytecode: hexToBin(bytecode), prefix: 'bchtest' });
+function lockingBytecodeToAddress(bytecode: string, network: GardenNetwork) {
+  const result = lockingBytecodeToCashAddress({ bytecode: hexToBin(bytecode), prefix: gardenPrefix(network) });
   if (typeof result === 'string') throw new GardenTransactionError({ message: result });
   return result.address;
 }
 export async function prepareGrant(provider: NetworkProvider, ledger: Ledger, id: string, wallet: string, amount: number, treasuryKey: string) {
+  if (provider.network !== 'chipnet') throw new GardenTransactionError({ message: 'Sponsored credit is available only on Chipnet.' });
   const decodedKey = decodePrivateKeyWif(treasuryKey);
   if (typeof decodedKey === 'string' || decodedKey.type !== 'testnet') throw new GardenTransactionError({ message: 'Use a dedicated compressed testnet/Chipnet treasury key.' });
   const signer = new SignatureTemplate(treasuryKey);

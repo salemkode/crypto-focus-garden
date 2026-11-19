@@ -1,11 +1,12 @@
 import { binToHex } from '@bitauth/libauth';
 import { z } from 'zod';
 import { aboutOutputBytecode, checkMerge, parseTree, planterTag, plantedCommitment, profileCommitment } from './forest';
-import { GardenTransactionError, intentSchema, preparedSchema, resolvePrepared } from './index';
+import { GardenTransactionError, gardenIntent, gardenNetwork, intentSchema, resolvePrepared } from './index';
 
 const bytecode = (pattern: RegExp) => z.string().regex(pattern);
 const p2pkh = bytecode(/^76a914[0-9a-f]{40}88ac$/);
 const policySchema = z.object({
+  network: gardenNetwork.default('chipnet'),
   category: z.string().regex(/^[0-9a-f]{64}$/),
   /** P2SH32 locking bytecode of the pinned Focus Forest contract. */
   contractBytecode: bytecode(/^aa20[0-9a-f]{64}87$/),
@@ -21,10 +22,10 @@ const FEE = 2000n;
 const DEPOSIT = 1000n;
 
 /** Independent check of a prepared Focus Garden transaction before the app wallet signs it. */
-export function validateRewardTransaction(prepared: z.input<typeof preparedSchema>, requested: z.input<typeof intentSchema>, config: z.input<typeof policySchema>) {
-  const intent = intentSchema.parse(requested);
+export function validateRewardTransaction(prepared: Parameters<typeof resolvePrepared>[0], requested: z.input<typeof intentSchema>, config: z.input<typeof policySchema>) {
   const policy = policySchema.parse(config);
-  const resolved = resolvePrepared(prepared);
+  const intent = gardenIntent(policy.network).parse(requested);
+  const resolved = resolvePrepared(prepared, policy.network);
   const { transaction, sourceOutputs } = resolved;
   function require(condition: boolean, message: string): asserts condition {
     if (!condition) throw new GardenTransactionError({ message });

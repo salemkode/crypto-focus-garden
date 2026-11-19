@@ -1,31 +1,31 @@
 import { createVirtualMachineBch2026, hexToBin } from '@bitauth/libauth';
 import { z } from 'zod';
-import { GardenTransactionError, chainIdentitySchema, address, decode, hex, intentSchema, ownershipContext, preparedSchema, resolvePrepared, transactionId, unsignedFingerprint } from '@focus-garden/protocol';
+import { GardenTransactionError, chainIdentitySchema, gardenAddress, gardenIntent, gardenNetwork, gardenPrepared, decode, hex, ownershipContext, type GardenNetwork, resolvePrepared, transactionId, unsignedFingerprint } from '@focus-garden/protocol';
 import { parseTree, planterTag } from '@focus-garden/protocol/forest';
 import { observationSchema } from './chain';
 import { Ledger, operationSchema } from './ledger';
 import { lockingBytecode, outpoint, prepareGrant, prepareReward } from './transactions';
 import type { NetworkProvider } from 'cashscript';
 
-const requestSchema = z.discriminatedUnion('method', [
-  z.object({ method: z.literal('whoami') }),
-  z.object({ method: z.literal('rebroadcast'), id: z.string().uuid() }),
-  z.object({ method: z.literal('challenge'), wallet: address }),
-  z.object({ method: z.literal('prove'), wallet: address, nonce: z.string().uuid(), unlockingBytecode: hex }),
-  z.object({ method: z.literal('credit'), wallet: address, key: z.string().uuid(), action: z.enum(['plant', 'claim', 'merge', 'register']) }),
-  z.object({ method: z.literal('leaderboard'), period: z.enum(['week', 'all']).default('week') }),
-  z.object({ method: z.literal('profile'), wallet: address }),
-  z.object({ method: z.literal('prepare'), wallet: address, key: z.string().uuid(), intent: intentSchema }),
-  z.object({ method: z.literal('submit'), id: z.string().uuid(), raw: hex }),
-  z.object({ method: z.literal('reconcile'), id: z.string().uuid() }),
-  z.object({ method: z.literal('recover'), key: z.string().uuid().optional(), wallet: address.optional() }),
-  z.object({ method: z.literal('garden'), wallet: address }),
-]);
+function requestFor(network: GardenNetwork) {
+  const address = gardenAddress(network);
+  return z.discriminatedUnion('method', [
+    z.object({ method: z.literal('whoami') }),
+    z.object({ method: z.literal('rebroadcast'), id: z.string().uuid() }),
+    z.object({ method: z.literal('challenge'), wallet: address }),
+    z.object({ method: z.literal('prove'), wallet: address, nonce: z.string().uuid(), unlockingBytecode: hex }),
+    z.object({ method: z.literal('credit'), wallet: address, key: z.string().uuid(), action: z.enum(['plant', 'claim', 'merge', 'register']) }),
+    z.object({ method: z.literal('leaderboard'), period: z.enum(['week', 'all']).default('week') }),
+    z.object({ method: z.literal('profile'), wallet: address }),
+    z.object({ method: z.literal('prepare'), wallet: address, key: z.string().uuid(), intent: gardenIntent(network) }),
+    z.object({ method: z.literal('submit'), id: z.string().uuid(), raw: hex }),
+    z.object({ method: z.literal('reconcile'), id: z.string().uuid() }),
+    z.object({ method: z.literal('recover'), key: z.string().uuid().optional(), wallet: address.optional() }),
+    z.object({ method: z.literal('garden'), wallet: address }),
+  ]);
+}
 const profileSchema = z.object({ wallet: z.string(), account: z.string(), name: z.string(), about: z.string(), operation: z.string(), registeredAt: z.number() });
 const WEEK_MS = 7 * 86_400_000;
-function binToHexOf(wallet: string) {
-  return Array.from(lockingBytecode(wallet), (byte) => byte.toString(16).padStart(2, '0')).join('');
-}
 const sessionSchema = z.object({ commitment: z.string(), account: z.string(), wallet: z.string(), reward: z.string(), duration: z.number().int().nonnegative().max(24 * 512).refine((seconds) => seconds % 512 === 0), plantedAt: z.number(), plant: z.string(), claim: z.string().nullable(), mergedInto: z.string().nullable() });
 export function createGardenService(config: {
   ledger: Ledger; minimumConfirmations: number; writesEnabled: boolean; chainIdentity: z.infer<typeof chainIdentitySchema>; provider: NetworkProvider; category: string; budget: number; dailyBudget?: number; treasuryKey?: string; directoryCategory?: string;
@@ -34,7 +34,16 @@ export function createGardenService(config: {
   maturity: (txid: string, duration: number) => Promise<'confirming' | 'locked' | 'claimable'>;
 }) {
   const { ledger, provider } = config;
-  if (provider.network !== 'chipnet' || !Number.isSafeInteger(config.budget) || config.budget < 0) throw new GardenTransactionError({ message: 'Invalid chipnet service configuration.' });
+  const network = gardenNetwork.parse(provider.network);
+  if (!Number.isSafeInteger(config.budget) || config.budget < 0) throw new GardenTransactionError({ message: 'Invalid garden service budget.' });
+  if (network === 'mainnet' && (config.treasuryKey || config.budget !== 0 || (config.dailyBudget ?? 0) !== 0)) throw new GardenTransactionError({ message: 'Mainnet sessions must be self-funded.' });
+  ledger.bindNetwork(network);
+  const requestSchema = requestFor(network);
+  const preparedSchema = gardenPrepared(network);
+  const writeRequired = 'The validating node write route is unavailable. Read-only recovery remains available.';
+  function binToHexOf(wallet: string) {
+    return Array.from(lockingBytecode(wallet, network), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  }
   z.number().int().min(2).max(144).parse(config.minimumConfirmations);
   const vm = createVirtualMachineBch2026();
   async function reconcile(account: string, id: string) {
@@ -56,7 +65,7 @@ export function createGardenService(config: {
       if (operation.raw !== raw) throw new GardenTransactionError({ message: 'An operation cannot be replaced with a different transaction.' });
       return reconcile(account, id);
     }
-    if (!config.writesEnabled) throw new GardenTransactionError({ message: 'The bounded Chipnet test-write route is not configured. Read-only recovery remains available.' });
+    if (!config.writesEnabled) throw new GardenTransactionError({ message: writeRequired });
     ledger.requireWrites();
     const txid = transactionId(raw);
     const started = ledger.db.transaction(() => {
@@ -112,7 +121,7 @@ export function createGardenService(config: {
   }
   async function handle(account: string, input: z.input<typeof requestSchema>) {
     const request = requestSchema.parse(input);
-    if (request.method === 'whoami') return { account, network: 'chipnet' as const, chainIdentity: chainIdentitySchema.parse(config.chainIdentity), category: config.category, writesEnabled: config.writesEnabled, minimumConfirmations: config.minimumConfirmations };
+    if (request.method === 'whoami') return { account, network, chainIdentity: chainIdentitySchema.parse(config.chainIdentity), category: config.category, writesEnabled: config.writesEnabled, minimumConfirmations: config.minimumConfirmations };
     if (request.method === 'leaderboard') return leaderboard(request.period);
     if (request.method === 'profile') {
       ledger.bound(account, request.wallet);
@@ -124,7 +133,7 @@ export function createGardenService(config: {
     if (request.method === 'rebroadcast') {
       const operation = await reconcile(account, request.id);
       if (!operation.raw || !operation.txid || operation.state !== 'pending') throw new GardenTransactionError({ message: 'Only the same unresolved signed transaction can be explicitly resubmitted.' });
-      if (!config.writesEnabled) throw new GardenTransactionError({ message: 'The bounded Chipnet test-write route is not configured. Read-only recovery remains available.' });
+      if (!config.writesEnabled) throw new GardenTransactionError({ message: writeRequired });
     ledger.requireWrites();
       ledger.audit(account, 'explicit_same_bytes_rebroadcast', request.id);
       try { await provider.sendRawTransaction(operation.raw); } catch { return ledger.operation(account, request.id); }
@@ -136,7 +145,7 @@ export function createGardenService(config: {
     }
     if (request.method === 'reconcile') return reconcile(account, request.id);
     if (request.method === 'challenge') {
-      lockingBytecode(request.wallet);
+      lockingBytecode(request.wallet, network);
       const nonce = crypto.randomUUID();
       ledger.db.run('DELETE FROM challenges WHERE expires<?', [Date.now()]);
       ledger.db.run('DELETE FROM challenges WHERE account=?', [account]);
@@ -144,7 +153,7 @@ export function createGardenService(config: {
       return { account, nonce };
     }
     if (request.method === 'prove') {
-      const context = ownershipContext(account, request.nonce, lockingBytecode(request.wallet));
+      const context = ownershipContext(account, request.nonce, lockingBytecode(request.wallet, network), network);
       context.transaction.inputs[0].unlockingBytecode = hexToBin(request.unlockingBytecode);
       if (vm.verify(context) !== true) throw new GardenTransactionError({ message: 'Wallet ownership signature is invalid.' });
       ledger.db.transaction(() => {
@@ -177,20 +186,24 @@ export function createGardenService(config: {
         const state = plant.state !== 'seen' ? 'confirming' as const : claim?.state === 'seen' ? held ? 'claimed' as const : 'transferred' as const : claim?.raw ? 'claiming' as const : await config.maturity(plant.txid!, entry.duration);
         return { ...row(entry, plant, claim), state };
       }));
-      return { network: 'chipnet' as const, minimumConfirmations: config.minimumConfirmations, creditSatoshis: Number(coins.filter((coin) => !coin.token && ledger.available(outpoint(coin))).reduce((sum, coin) => sum + coin.satoshis, 0n)), sessions: rows.filter((row) => row !== null) };
+      return { network, minimumConfirmations: config.minimumConfirmations, creditSatoshis: Number(coins.filter((coin) => !coin.token && ledger.available(outpoint(coin))).reduce((sum, coin) => sum + coin.satoshis, 0n)), sessions: rows.filter((row) => row !== null) };
     }
     if (request.method === 'submit') {
-      if (!config.writesEnabled) throw new GardenTransactionError({ message: 'The bounded Chipnet test-write route is not configured. Read-only recovery remains available.' });
+      if (!config.writesEnabled) throw new GardenTransactionError({ message: writeRequired });
     ledger.requireWrites();
       const operation = ledger.operation(account, request.id);
       if (operation.kind === 'credit' || !operation.payload) throw new GardenTransactionError({ message: 'No prepared reward transaction.' });
       const prepared = preparedSchema.parse(JSON.parse(operation.payload));
-      const resolved = resolvePrepared(prepared);
+      const resolved = resolvePrepared(prepared, network);
       const signed = decode(request.raw);
       if (unsignedFingerprint(signed) !== unsignedFingerprint(resolved.transaction)) throw new GardenTransactionError({ message: 'Signed transaction differs from the prepared operation.' });
       const verified = vm.verify({ transaction: signed, sourceOutputs: resolved.sourceOutputs });
       if (verified !== true) throw new GardenTransactionError({ message: `Transaction validation failed: ${verified}` });
       return broadcast(account, operation.id, request.raw);
+    }
+    if (network === 'mainnet') {
+      if (!config.writesEnabled) throw new GardenTransactionError({ message: writeRequired });
+      ledger.requireWrites();
     }
     ledger.bound(account, request.wallet);
     // Refresh earlier financial observations before allocating another grant or
@@ -211,6 +224,7 @@ export function createGardenService(config: {
         ledger.markSeen(receipt.id);
         return { state: 'funded' as const };
       }
+      if (network === 'mainnet') throw new GardenTransactionError({ message: 'Fund your app wallet with confirmed Mainnet BCH before continuing.' });
       if (!config.treasuryKey) throw new GardenTransactionError({ message: 'Treasury is not configured.' });
       const operation = ledger.reserve({ account, key: request.key, wallet: request.wallet, kind: 'credit', intent, amount, budget: config.budget, dailyBudget: config.dailyBudget });
       const grant = await prepareGrant(provider, ledger, operation.id, request.wallet, amount, config.treasuryKey);
@@ -245,7 +259,7 @@ export function createGardenService(config: {
     const operation = ledger.reserve({ account, key: request.key, wallet: request.wallet, kind: request.intent.action, intent, amount: 0, budget: config.budget, dailyBudget: config.dailyBudget });
     const reward = await prepareReward(provider, ledger, operation.id, account, request.wallet, config.category, request.intent, { directoryCategory: config.directoryCategory });
     if (request.intent.action === 'register') ledger.db.run('INSERT INTO profiles VALUES(?,?,?,?,?,?)', [request.wallet, account, request.intent.name.trim(), request.intent.about.trim(), operation.id, Date.now()]);
-    const prepared = { ...reward, chainIdentity: config.chainIdentity };
+    const prepared = preparedSchema.parse({ ...reward, chainIdentity: config.chainIdentity });
     ledger.db.run("UPDATE operations SET state='prepared',payload=? WHERE id=?", [JSON.stringify(prepared), operation.id]);
     if (session) ledger.db.run('UPDATE sessions SET claim=? WHERE commitment=?', [operation.id, session.commitment]);
     return ledger.operation(account, operation.id);

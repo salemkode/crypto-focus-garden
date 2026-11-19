@@ -1,45 +1,53 @@
 import { binToHex, cashAddressToLockingBytecode } from '@bitauth/libauth';
 import { z } from 'zod';
-import { GardenTransactionError, decode, transactionId } from '@focus-garden/protocol';
+import { GardenTransactionError, decode, gardenNetwork, gardenPrefix, MAX_TRANSACTION_HEX_LENGTH, transactionId } from '@focus-garden/protocol';
 import type { NetworkProvider } from 'cashscript';
 
 const hash = z.string().regex(/^[0-9a-f]{64}$/);
 export const observationSchema = z.object({ state: z.enum(['missing', 'mempool', 'confirming', 'confirmed', 'conflicted']), confirmations: z.number().int().nonnegative(), blockHash: hash.nullable(), blockTime: z.number().int().nullable() });
 export const nodeConfigSchema = z.object({
+  network: gardenNetwork.default('chipnet'),
   url: z.url().refine((value) => { const url = new URL(value); return !url.username && !url.password && (url.protocol === 'https:' || (url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname))); }, 'RPC requires HTTPS or loopback HTTP; credentials belong in the secret file.'),
   genesisHash: hash, checkpointHeight: z.number().int().positive(), checkpointHash: hash,
   minimumConfirmations: z.number().int().min(2).max(144).default(6),
   maximumTipAgeSeconds: z.number().int().min(300).max(86400).default(21600),
 });
-const blockchain = z.object({ chain: z.literal('chip'), blocks: z.number().int().positive(), headers: z.number().int().positive(), bestblockhash: hash, initialblockdownload: z.literal(false), verificationprogress: z.number().min(0.9999), pruned: z.literal(false) });
+const blockchain = z.object({ chain: z.enum(['chip', 'main']), blocks: z.number().int().positive(), headers: z.number().int().positive(), bestblockhash: hash, initialblockdownload: z.literal(false), verificationprogress: z.number().min(0.9999), pruned: z.literal(false) });
 const header = z.object({ hash, height: z.number().int().nonnegative(), confirmations: z.number().int(), time: z.number().int(), mediantime: z.number().int() });
 
 export class NodeRpcError extends GardenTransactionError {
   constructor(readonly code: number, message: string) { super({ message }); }
 }
+class SourceTransactionTooLarge extends GardenTransactionError {}
 export class ValidatedNodeProvider implements NetworkProvider {
-  readonly network = 'chipnet' as const;
   readonly config;
   constructor(input: z.input<typeof nodeConfigSchema>, readonly rpc: (method: string, params: (string | number | boolean | string[])[]) => Promise<unknown>, readonly discovery: Pick<NetworkProvider, 'getUtxos'>, readonly writeRpc?: typeof rpc) { this.config = nodeConfigSchema.parse(input); }
+  get network() { return this.config.network; }
+  private async blockchainInfo() {
+    const info = blockchain.parse(await this.rpc('getblockchaininfo', []));
+    if (info.chain !== (this.network === 'mainnet' ? 'main' : 'chip')) throw new GardenTransactionError({ message: 'Validating node reports a different BCH network.' });
+    return info;
+  }
   async ready() {
-    const chain = blockchain.parse(await this.rpc('getblockchaininfo', []));
+    const chain = await this.blockchainInfo();
     if (chain.headers - chain.blocks > 2 || chain.blocks < this.config.checkpointHeight) throw new GardenTransactionError({ message: 'Validating node is not synchronized.' });
     const genesis = hash.parse(await this.rpc('getblockhash', [0]));
     if (genesis !== this.config.genesisHash) throw new GardenTransactionError({ message: 'Node genesis does not match the shared network agreement.' });
     const checkpoint = hash.parse(await this.rpc('getblockhash', [this.config.checkpointHeight]));
-    if (checkpoint !== this.config.checkpointHash) throw new GardenTransactionError({ message: 'Node does not match the independently provisioned Chipnet checkpoint.' });
+    if (checkpoint !== this.config.checkpointHash) throw new GardenTransactionError({ message: 'Node does not match the independently provisioned network checkpoint.' });
     const tip = header.parse(await this.rpc('getblockheader', [chain.bestblockhash, true]));
     const age = Math.floor(Date.now() / 1000) - tip.time;
     if (tip.hash !== chain.bestblockhash || tip.height !== chain.blocks || tip.confirmations < 1 || age > this.config.maximumTipAgeSeconds || age < -7200) throw new GardenTransactionError({ message: 'Node tip is stale or inconsistent.' });
     return { chain, tip };
   }
   async sameTip(expected: string) {
-    const current = blockchain.parse(await this.rpc('getblockchaininfo', []));
+    const current = await this.blockchainInfo();
     if (current.bestblockhash !== expected) throw new GardenTransactionError({ message: 'Chain changed during verification. Refresh status before proceeding.' });
   }
   async getBlockHeight() { return (await this.ready()).chain.blocks; }
   async getRawTransaction(txid: string) {
-    const raw = z.string().regex(/^(?:[0-9a-f]{2})+$/).parse(await this.rpc('getrawtransaction', [hash.parse(txid), false]));
+    const raw = z.string().parse(await this.rpc('getrawtransaction', [hash.parse(txid), false]));
+    if (raw.length > MAX_TRANSACTION_HEX_LENGTH) throw new SourceTransactionTooLarge({ message: 'Source transaction is larger than the supported signing payload.' });
     if (transactionId(raw) !== txid) throw new GardenTransactionError({ message: 'Node transaction hash mismatch.' });
     return raw;
   }
@@ -53,12 +61,15 @@ export class ValidatedNodeProvider implements NetworkProvider {
   async getUtxos(address: string) {
     const view = await this.ready();
     const script = cashAddressToLockingBytecode(address);
-    if (typeof script === 'string' || !address.startsWith('bchtest:')) throw new GardenTransactionError({ message: 'Expected a Chipnet address.' });
+    if (typeof script === 'string' || !address.startsWith(`${gardenPrefix(this.network)}:`)) throw new GardenTransactionError({ message: 'Expected an address on the configured network.' });
     // Discovery can omit candidates (availability), but cannot invent spendable
     // value, tokens or confirmations: every candidate is resolved by our node.
     const candidates = await this.discovery.getUtxos(address);
     const verified = await Promise.all(candidates.map(async (candidate) => {
-      const output = await this.inspectOutput(candidate.txid, candidate.vout);
+      const output = await this.inspectOutput(candidate.txid, candidate.vout).catch((cause: unknown) => {
+        if (cause instanceof SourceTransactionTooLarge) return null;
+        throw cause;
+      });
       if (!output || output.confirmations < this.config.minimumConfirmations) return null;
       if (output.bestblock !== view.chain.bestblockhash || binToHex(output.source.lockingBytecode) !== binToHex(script.bytecode)) throw new GardenTransactionError({ message: 'Address discovery returned an unrelated or inconsistent output.' });
       const token = output.source.token;
@@ -105,13 +116,17 @@ export class ValidatedNodeProvider implements NetworkProvider {
     if (output.bestblock !== view.chain.bestblockhash || output.confirmations < this.config.minimumConfirmations) throw new GardenTransactionError({ message: 'Reward ownership is not confirmed.' });
     return binToHex(output.source.lockingBytecode) === rewardScript && output.source.token?.nft?.capability === 'none' && binToHex(output.source.token.nft.commitment) === commitment;
   }
-  async sendRawTransaction(raw: string) {
-    await this.ready();
+  async readyWriter() {
     const writer = this.writeRpc;
-    if (!writer) throw new GardenTransactionError({ message: 'A bounded dedicated Chipnet test-write route has not been configured.' });
+    if (!writer) throw new GardenTransactionError({ message: 'A node write route has not been configured.' });
     const genesis = hash.parse(await writer('getblockhash', [0]));
     const checkpoint = hash.parse(await writer('getblockhash', [this.config.checkpointHeight]));
-    if (genesis !== this.config.genesisHash || checkpoint !== this.config.checkpointHash) throw new GardenTransactionError({ message: 'Test-write route does not match the verified shared Chipnet environment.' });
+    if (genesis !== this.config.genesisHash || checkpoint !== this.config.checkpointHash) throw new GardenTransactionError({ message: 'Node write route does not match the verified network.' });
+    return writer;
+  }
+  async sendRawTransaction(raw: string) {
+    await this.ready();
+    const writer = await this.readyWriter();
     const accepted = z.array(z.object({ allowed: z.boolean() })).length(1).parse(await writer('testmempoolaccept', [[raw]]));
     if (!accepted[0].allowed) throw new GardenTransactionError({ message: 'The validating node rejected the transaction. Preserve the operation for investigation.' });
     return hash.parse(await writer('sendrawtransaction', [raw]));
