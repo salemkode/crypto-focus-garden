@@ -2,7 +2,7 @@
 
 `testnetFunctionalReady=false` · `publicReleaseReady=false`
 
-Executable code is in `packages/service`, `packages/protocol`, and the unified Expo client. Current priority is the complete **functional Chipnet journey**; public publication and cosmetic polish are deferred. See [actual acceptance procedure](chipnet-acceptance.md) and [delivery matrix](../RELEASE-STATUS.md). No live grant, plant, claim or baton transaction has been executed by this implementation.
+Executable code is in `packages/service`, `packages/protocol`, and the unified Expo client. Current priority is the complete **functional Chipnet journey**; public publication and cosmetic polish are deferred. See [actual acceptance procedure](chipnet-acceptance.md). No live grant, plant, claim or baton transaction has been executed by this implementation.
 
 ## Chain authority and confirmation policy
 
@@ -76,4 +76,4 @@ Pause controls/audit records persist. `resume` is explicit. The guarded reservat
 
 ## Current evidence and outstanding gates
 
-63 local tests pass (26 mobile,17 covenant/credit,20 service), typecheck/lint pass,39,130 native crypto comparisons match, both Hermes exports and Android/iOS simulator native builds pass. Evidence/hashes are in `artifacts/testnet-delivery`. Tests use explicit offline node/discovery fixtures; no live transaction IDs exist. Owned-node endpoint/genesis/tip measurement, usable exclusively owned Android/iOS targets, dedicated funded setup, and both actual native CSV/claim/restart cycles remain required. See RELEASE-STATUS.md for the precise blockers, including the fresh Android boot failure.
+63 local tests pass (26 mobile,17 covenant/credit,20 service), typecheck/lint pass,39,130 native crypto comparisons match, both Hermes exports and Android/iOS simulator native builds pass. Tests use explicit offline node/discovery fixtures; no live transaction IDs exist. Owned-node endpoint/genesis/tip measurement, usable exclusively owned Android/iOS targets, dedicated funded setup, and both actual native CSV/claim/restart cycles remain required.

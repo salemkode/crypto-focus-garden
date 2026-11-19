@@ -55,4 +55,4 @@ Expo Go is not supported; the app needs a development build because it ships nat
 
 ## License
 
-MIT
+[MIT](LICENSE)

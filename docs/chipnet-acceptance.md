@@ -4,21 +4,19 @@
 
 This is the reproducible path for the implemented native/service journey. It has **not** been executed against a live validating Chipnet node. Local tests and compiled artifacts support it but do not establish financial or device acceptance. Cosmetic polish, store publication and unrelated launch infrastructure are deferred.
 
-## 1. Bind the shared environment and owned targets
+## 1. Connect a validating Chipnet node
 
-Use the single node/indexer owner's `docs/chipnet-connection.json` and coordinator `docs/testnet-shared-environment.json` in the Blaze workspace. At this checkpoint the endpoint is unavailable and genesis/tip measurement is pending. Do not provision another node or download the chain.
+Run, or get access to, a fully validating BCHN Chipnet node (see the requirements below). No public node is assumed, and nothing here downloads the chain for you.
 
-The independently established fork checkpoint is height **115252**, hash **00000000040ba9641ba98a37b2e5ceead38e4e2930ac8f145c8094f94c708727**, from official BCHN v29.2.0 `src/chainparams.cpp`. It distinguishes Chipnet from testnet4. It has not yet been measured against an available shared BCHN endpoint. The sibling Electrum observation at height 121957 is separate discovery/identity evidence, not owned-node or SPV proof.
+The independently established fork checkpoint is height **115252**, hash **00000000040ba9641ba98a37b2e5ceead38e4e2930ac8f145c8094f94c708727**, from official BCHN v29.2.0 `src/chainparams.cpp`. It distinguishes Chipnet from testnet4. It has not yet been measured against an available shared BCHN endpoint.
 
-Supply the owner-measured genesis hash, this agreed checkpoint and credential-free endpoint metadata to service/mobile configuration. Credentials come from owner-managed mode-0600 files or `request_secret`, never chat or source. Do not open duplicate secret requests: the indexer already owns the pending RPC setup request.
+Configure the service and the app with the node's measured genesis hash, this checkpoint and credential-free endpoint metadata. Keep RPC credentials in mode-0600 files outside the repository, never in source, chat or `EXPO_PUBLIC_*` variables.
 
 The service requires an operator-owned fully validating, synchronized BCHN Chipnet node with retained raw-transaction lookup (`txindex=1`, `prune=0`, `assumevalid=0`). Its read route needs `getblockchaininfo`, `getblockhash`, `getblockheader`, `getrawtransaction`, and `gettxout`. A **separate bounded test-write route** needs `getblockhash` (to verify genesis and the fork checkpoint), `testmempoolaccept` and `sendrawtransaction`. No automatic elevation of indexer read credentials occurs. Both capabilities must identify the same agreed Chipnet. Plain address prefixes and chain labels are insufficient.
 
 Default policy requires six canonical confirmations; configuration may explicitly select 2–144 for an isolated test environment, with the mobile build requiring at least its configured minimum. Record the actual choice. A node acceptance or mempool receipt is not a claimed tree. Maturity uses canonical block headers and validated-node MTP, not phone time. Electrum only suggests address outpoints; the own node verifies scripts, amounts, tokens, unspent status and confirmations.
 
-Current Android assignment: **Blaze_FocusGarden_20261115**, session **blaze-focus-garden-acceptance-20261115**, Metro **8083**, canonical worktree unchanged. No ready serial is assigned. The diagnostic recovery boot failed when Argent treated `adb: device offline` during `sys.boot_completed` as terminal and terminated the emulator after about 18 seconds. Do not reuse candidate serial 5558, retry automatically, wipe userdata, or boot while Libauth owns the cold-boot window. The original AVD configuration was backed up, only its GPU preference was changed, and its observed 6g runtime partition was not resized. See `artifacts/testnet-delivery/android-boot-attempt.json`.
-
-A fresh iOS simulator still needs permitted operator creation and exclusive assignment; no existing foreign simulator or physical phone may be taken. Generic iOS compilation does not establish runtime ownership or rendering. Argent remains the sole device controller; never enable T3 agent-device access or use simctl/another controller.
+Use a dedicated test phone, emulator or simulator with a fresh install, never one that holds a wallet with real funds.
 
 ## 2. Prepare dedicated test identities and the v3 baton
 
@@ -68,15 +66,15 @@ bun run service:start
 
 The service listens only on loopback port **3487**. No public deployment or publication is needed for a local debug acceptance run. `/healthz` is process health; `/readyz` checks node/ledger availability, not functional acceptance. They never set public release readiness.
 
-For an **owned ready Android debug target**, use its verified serial with `adb reverse tcp:3487 tcp:3487` and `adb reverse tcp:8083 tcp:8083`. This is a transport bridge only; UI control remains Argent. Set public mobile configuration to the actual category, v3 locking bytecode, genesis/fork pins, and minimum confirmations. For this isolated local run only, set `EXPO_PUBLIC_GARDEN_API_URL=http://127.0.0.1:3487` and `EXPO_PUBLIC_GARDEN_LOCAL_TEST_HTTP=1`. The code allows that exact port/loopback route only when `__DEV__` is true. LAN HTTP and all release-build HTTP remain rejected; normal/release integration requires HTTPS. Credentials remain in SecureStore. Keep Metro 8083 and do not stop another owner's processes.
+For an Android debug build, bridge the ports with `adb reverse tcp:3487 tcp:3487` and `adb reverse tcp:8083 tcp:8083`. Set public mobile configuration to the actual category, v3 locking bytecode, genesis/fork pins, and minimum confirmations. For this isolated local run only, set `EXPO_PUBLIC_GARDEN_API_URL=http://127.0.0.1:3487` and `EXPO_PUBLIC_GARDEN_LOCAL_TEST_HTTP=1`. The code allows that exact port/loopback route only when `__DEV__` is true. LAN HTTP and all release-build HTTP remain rejected; normal/release integration requires HTTPS. Credentials remain in SecureStore.
 
-The current standalone APK embeds JavaScript but has no live backend/category/genesis configuration. Rebuild its JS with actual public configuration if used for acceptance. It will not accept debug HTTP. Native debug APK and iOS simulator build contain the new auth/privacy modules and can use the assigned development bundle. Do not install over a different signing identity or wipe a wallet to fix an install problem.
+The current standalone APK embeds JavaScript but has no live backend/category/genesis configuration. Rebuild its JS with actual public configuration if used for acceptance. It will not accept debug HTTP. Native debug APK and iOS simulator build contain the new auth/privacy modules and can load the development bundle. Do not install over a different signing identity or wipe a wallet to fix an install problem.
 
 ## 4. Execute the actual native journeys
 
-Use Argent with fresh accessibility/component discovery before taps. Start a recorder before the first walk if preserving a repeatable flow. Never derive coordinates from screenshots. Native private backups and tokens must not enter screenshots, element logs or saved flows: use secure input placeholders and keep manual backup reveal/write-down outside captured automation.
+Keep recovery phrases, private backups and tokens out of screenshots, logs and saved test flows: type them through secure input and write backups down by hand.
 
-1. Verify ready serial/UDID, exact fresh target name, exclusive ownership and app ID before install/launch. Confirm the original shared empty island renders. Capture public UI evidence only.
+1. Check the device, a fresh install and the app ID before launching. Confirm the empty starting island renders.
 2. Explicitly create the dedicated XO app wallet. Record its **public** address. Verify original raw-key and XO namespaces/app identifiers remain separate. With device authentication configured, verify backup protection; cancel captured reveal prompts. A user may privately write down the backup and restore through secure input on a second owned clean target. Do not expose it through automation. The restore route cannot replace an existing vault or change identity during a saved operation.
 3. Save the dedicated external recipient's public receive address and the test-account access token. Address entry does not claim external-wallet ownership verification. The service verifies possession of the **app** key with a one-use challenge.
 4. Request limited planting credit. Record grant txid and exact response status. Confirm mempool/shallow observations remain pending/confirming, no second grant is allocated, and six (or the recorded configured minimum) canonical confirmations are required before completion. Restart the app while pending; recover the same operation, not a replacement.
@@ -90,14 +88,12 @@ Use Argent with fresh accessibility/component discovery before taps. Start a rec
 
 Reorg behavior has deterministic adapter/integration tests. Do not invalidate the shared node or manufacture a public-chain fork for a badge. If a real Chipnet reorg is observed, retain canonical before/after hashes and state regressions separately. Controlled regtest/fixture reorg evidence must remain labeled supporting evidence, never live Chipnet proof.
 
-On a physical iPhone, the agent must obtain the required human confirmation before irreversible actions even when using test coins. The current assignment does not authorize using a phone or another owner's target.
+On a physical phone, confirm every irreversible action by hand, even with test coins.
 
 ## 5. Record evidence and resume safely
 
-Record only public identities, category/artifact/source revision and code fingerprint, exact commands, public txids/outpoints, block/hash/MTP/confirmation state, result/recovery/error observations, and public UI screenshots with target ownership. Retain secrets only in device secure storage or ignored private files. Current evidence is `artifacts/testnet-delivery/local-evidence.json`; it contains **no live transaction IDs** and both readiness flags are false.
+Record only public identities, category/artifact/source revision and code fingerprint, exact commands, public txids/outpoints, block/hash/MTP/confirmation state, result/recovery/error observations, and public UI screenshots with target ownership. Retain secrets only in device secure storage or ignored private files. No live transaction has been recorded yet, and both readiness flags are false.
 
 A consistent SQLite backup can be taken online with `bun run backup SOURCE NEW_BACKUP`. It checks integrity and writes mode 0600. To restore: drain/stop only this service instance, preserve the old ledger and WAL, integrity-check the backup, restore to the configured path, start without any automatic broadcasts, and reconcile all recorded pending txids against the node before allowing grants. Never lose pending history, replace a submitted transaction, or treat a missing receipt as permission to pay again.
 
 Account operations: `bun run admin revoke DB ACCOUNT`, `bun run admin rotate DB ACCOUNT NEW_PRIVATE_TOKEN_FILE`, `bun run admin pause DB treasury.paused`, and `bun run admin pause DB broadcasts.paused`. Rotation preserves the authenticated account and pending operations. Client credential replacement during a pending operation must match that original account. Never-prepared reservations may be inspected/released with the existing guarded recovery utility; prepared or submitted records are not canceled automatically.
-
-No boot retries are authorized during another owner's cold-boot window. Resume device work only after the coordinator releases that window and the demonstrated Argent boot failure is addressed. Resume real Chipnet work only after the shared owner provides a measured connection/capability contract; do not open a duplicate node or secret card.

@@ -9,7 +9,7 @@ Snapshot: 15 November 2026. Branch: `feat/unify-focus-garden-expo`. The user exp
 - `packages/mobile`: **one** Expo SDK 58 / React Native 0.88 / Expo Router application. The previous SDK 54 shell has been replaced, not kept as another runtime.
 - `packages/garden`: original voxel island/tree/sapling models shared by both web and mobile. Web uses Three.js WebGL; mobile uses Expo GL/Three. No WebView or unrelated native checkerboard substitutes for the original garden.
 
-The separate native repository is a preserved source archive, not a runtime dependency. No imports/configuration depend on its absolute path. Parent T3 organization work is responsible for archiving its duplicate project registration without deleting its history.
+The separate native repository is a preserved source archive, not a runtime dependency. No imports/configuration depend on its absolute path.
 
 ## Migrated and deliberately retained boundaries
 
@@ -72,7 +72,7 @@ Use the documented build app variant and preserve the device/session/Metro assig
 
 ## Device evidence and remaining limitations
 
-Assigned Android target remains `emulator-5554` / `FocusGarden_API36_1`, with historical foreign Brehon ownership. Argent lists it running but does not expose its owner. T3's read-only `device_list` returns: **“Agent device access is turned off for this environment.”** Enabling that integration is explicitly forbidden by workspace instructions. No authoritative current ownership proof was available, so no device interaction/install or visual QA was attempted; no claim was bypassed. The earlier native iOS blank-GL issue is not claimed fixed by successful bundling; the shared renderer avoids the old shadow-map path but still requires owned-device validation.
+This checkpoint did not include device QA. Later passes checked every screen on iOS, Android and the web; see [design-system.md](design-system.md). The earlier native iOS blank-GL issue no longer applies: the valley now renders with Filament natively and three.js on the web.
 
 Authenticated transaction credit and full v3 native plant/claim signing remain unfinished. Those actions are visibly unavailable; no simulated balance or local timer completion pretends to be a funded on-chain reward. WalletConnect v3 transaction support also remains future integration. The full upstream starter test suite is not represented by the focused v3 test command.
 
@@ -82,4 +82,4 @@ Validate startup/rendering and wallet restoration on an owned development device
 
 ## Subsequent funding/signing work
 
-The consolidation results above are its checkpoint, not verification of later edits. The subsequent service/native-v3 work is owned by the main implementation task and documented in [funding-service.md](funding-service.md) and the latest `PROJECT-HANDOFF.md` entry. Code for authenticated credit, preparation, local full-transaction validation/signing and recovery now exists. Deployment, financial acceptance and owned-device QA remain unperformed.
+The consolidation results above are its checkpoint, not verification of later edits. The subsequent service/native-v3 work is owned by the main implementation task and documented in [funding-service.md](funding-service.md). Code for authenticated credit, preparation, local full-transaction validation/signing and recovery now exists. Deployment, financial acceptance and owned-device QA remain unperformed.

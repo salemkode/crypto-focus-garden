@@ -2,7 +2,7 @@
 
 16 November 2026. Replaces the first UI pass (cream cards, caps labels, paragraph-heavy screens),
 which the user rejected as generic. The native bottom tab bar is the one part the user likes; it is
-kept as it is (`src/app/(tabs)/_layout.tsx` and its colors in `src/theme.json` are frozen). The Forest tab was removed at the user's request (16 November 2026); its last version is kept in `artifacts/ui-redesign-2026-11-16/forest-tab-removed.tgz`.
+kept as it is (`src/app/(tabs)/_layout.tsx` and its colors in `src/theme.json` are frozen). The Forest tab was removed at the user's request (16 November 2026).
 
 ## Design read
 
