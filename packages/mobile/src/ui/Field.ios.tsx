@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ComponentProps } from 'react';
 import { SecureField, Section, Text, TextField, useNativeState, type TextFieldRef } from '@expo/ui/swift-ui';
-import { autocorrectionDisabled, disabled as disabledModifier, foregroundStyle, onSubmit, textInputAutocapitalization } from '@expo/ui/swift-ui/modifiers';
+import { accessibilityLabel as a11yLabel, autocorrectionDisabled, disabled as disabledModifier, foregroundStyle, onSubmit, textInputAutocapitalization } from '@expo/ui/swift-ui/modifiers';
 import { Field as RNField } from './Field.rn';
 import { markNative, useNativeScope } from './native/scope';
 import { color } from './tokens';
@@ -27,6 +27,9 @@ function NativeField({ label, helper, error, multiline, value, onChangeText, pla
   }, [value]);
   const changed = (next: string) => { last.current = next; onChangeText?.(next); };
   const modifiers = [
+    // The section header is not the field's label for VoiceOver; without this a secure field is read
+    // only as "secure text field".
+    a11yLabel(label),
     ...(autoCapitalize ? [textInputAutocapitalization(CAPITALIZE[autoCapitalize])] : []),
     ...(autoCorrect === false ? [autocorrectionDisabled()] : []),
     ...(editable === false ? [disabledModifier()] : []),

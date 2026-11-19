@@ -87,7 +87,9 @@ export const WalletLink = nativeAware(function WalletLink({ onLinked }: { onLink
       </Group>
 
       {manual ? <>
-        <Field label="Chipnet address" value={draft} onChangeText={setDraft} autoCorrect={false} autoCapitalize="none" placeholder="bchtest:" />
+        {/* Return links the address: the keyboard can cover the button below on a short screen. */}
+        <Field label="Chipnet address" value={draft} onChangeText={setDraft} autoCorrect={false} autoCapitalize="none" placeholder="bchtest:"
+          returnKeyType="go" onSubmitEditing={() => { if (draft.trim() && ready && !saving) void saveManual(); }} />
         <Button variant="secondary" label="Link this address" busy={saving} disabled={!draft.trim() || !ready} onPress={() => void saveManual()} />
       </> : null}
     </> : null}
