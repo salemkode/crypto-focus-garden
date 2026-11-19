@@ -55,7 +55,7 @@ function PlannerSheet({ options, plan, onConfirm, onClose }: Omit<MergePlannerPr
         <Text accessibilityRole="header" className="text-title-3 text-ink">Merge</Text>
         <Text className="text-subhead text-ink-2">Combine smaller pieces into bigger ones.</Text>
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel="Close merge planner" onPress={onClose} className="h-9 w-9 items-center justify-center rounded-full bg-sunk active:opacity-60">
+      <Pressable accessibilityRole="button" accessibilityLabel="Close merge planner" onPress={onClose} hitSlop={4} className="h-9 w-9 items-center justify-center rounded-full bg-sunk active:opacity-60">
         <Icon name={icons.close} size={13} tint={color.ink2} weight="bold" />
       </Pressable>
     </View>

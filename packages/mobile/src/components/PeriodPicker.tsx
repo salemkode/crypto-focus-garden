@@ -16,8 +16,9 @@ export const PeriodPicker = nativeAware(function PeriodPicker({ period, anchor, 
       <Pressable accessibilityRole="button" accessibilityLabel={`Previous ${period}`} onPress={() => onChange(period, shiftAnchor(period, anchor, -1))} className="h-11 w-11 items-center justify-center rounded-full active:bg-sunk">
         <Icon name={icons.back} size={17} tint={color.moss} weight="semibold" />
       </Pressable>
-      <Pressable accessibilityRole={atPresent ? 'text' : 'button'} accessibilityLabel={label} accessibilityHint={atPresent ? undefined : `Shows ${CURRENT[period]}`} disabled={atPresent} onPress={() => onChange(period, now)} className="min-h-11 justify-center rounded-full px-3 active:bg-sunk">
-        <Text className="text-headline text-ink">{label}</Text>
+      <Pressable accessibilityRole={atPresent ? 'text' : 'button'} accessibilityLabel={label} accessibilityHint={atPresent ? undefined : `Shows ${CURRENT[period]}`} disabled={atPresent} onPress={() => onChange(period, now)} className="min-h-11 flex-1 items-center justify-center rounded-full px-3 active:bg-sunk">
+        {/* The full width between the arrows, on one line: Android measured the label narrower than it drew and dropped "week". */}
+        <Text numberOfLines={1} className="text-headline text-ink">{label}</Text>
       </Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel={`Next ${period}`} disabled={atPresent} onPress={() => onChange(period, shiftAnchor(period, anchor, 1))} className="h-11 w-11 items-center justify-center rounded-full active:bg-sunk disabled:opacity-25">
         <Icon name={icons.chevron} size={17} tint={color.moss} weight="semibold" />
