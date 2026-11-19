@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, type ComponentType, type Ref } from 'react';
-import { PanResponder, StyleSheet, View, type GestureResponderEvent } from 'react-native';
+import { PanResponder, Platform, StyleSheet, View, type GestureResponderEvent } from 'react-native';
 import { WebView as RNWebView } from 'react-native-webview';
 import type { AndroidWebViewProps, IOSWebViewProps, WebViewMessageEvent } from 'react-native-webview/lib/WebViewTypes';
 import type { FromValley, ToValley, ValleyHostHandle } from './protocol';
@@ -78,7 +78,8 @@ export function WebViewValleyHost({ ref, onMessage }: { ref: Ref<ValleyHostHandl
       setDisplayZoomControls={false}
       allowsLinkPreview={false}
       textInteractionEnabled={false}
-      dataDetectorTypes="none"
+      // Link detection is an iOS WebView prop. Android Fabric must not parse its enum.
+      dataDetectorTypes={Platform.OS === 'ios' ? 'none' : undefined}
       allowsBackForwardNavigationGestures={false}
       contentInsetAdjustmentBehavior="never"
       automaticallyAdjustContentInsets={false}

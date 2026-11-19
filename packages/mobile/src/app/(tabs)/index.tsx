@@ -178,7 +178,7 @@ export default function FocusScreen() {
             </View>
             <Icon name={icons.chevron} size={14} tint={color.ink3} weight="semibold" />
           </Pressable>
-          {localPreview ? <Text className="text-footnote text-ink-2">Your tree stays in this browser. No wallet needed.</Text> : null}
+          {localPreview ? <Text className="text-footnote text-ink-2">{androidPreview ? 'Your practice tree stays on this device. No wallet needed.' : 'Your tree stays in this browser. No wallet needed.'}</Text> : null}
           {canPlant ? <Button label={localPreview ? 'Try a focus session' : 'Plant'} icon={verified ? icons.lock : undefined} disabled={storage !== 'ready'} onPress={start}
             accessibilityHint={verified ? 'Locks this session on Bitcoin Cash. The grown tree is sent to your wallet.' : undefined} />
             : <Button label="Link your wallet to plant" icon={icons.wallet} onPress={() => router.push('/link-wallet')} />}

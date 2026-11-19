@@ -8,7 +8,7 @@ export const DOWNLOADS = {
 	/** iPhone install link (AppDrop share link). */
 	ios: "https://appdrop.app/d/prvhsh4gyx",
 	/** Android: a Play Store link or a direct .apk URL. */
-	android: "",
+	android: "https://github.com/salemkode/crypto-focus-garden/releases/download/blaze-2026-android-preview/Focus-Garden-BLAZE-Android.apk",
 	/** Web version of the app (Expo web build). */
 	web: "/",
 } as const;
