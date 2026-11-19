@@ -7,8 +7,11 @@ const variants: Record<string, string> = {
   product: 'com.arquebus.focusgarden',
   'expo-prototype': 'com.salemkode.libauthreactnative',
   foundation: 'com.focusgarden.mobile',
+  'blaze-android': 'com.arquebus.focusgarden.blaze',
 };
-const identity = variants[process.env.FOCUS_GARDEN_APP_VARIANT ?? 'product'] ?? variants.product;
+const variant = process.env.FOCUS_GARDEN_APP_VARIANT ?? 'product';
+const identity = variants[variant] ?? variants.product;
+const blazeAndroidPreview = variant === 'blaze-android';
 
 /**
  * FOCUS_SHIELD_IOS (default "1") adds Apple's Family Controls entitlement used for app blocking.
@@ -21,6 +24,7 @@ const shield = process.env.FOCUS_SHIELD_IOS !== '0';
 
 export default {
   ...app.expo,
+  ...(blazeAndroidPreview ? { name: 'Focus Garden BLAZE', scheme: 'focusgarden-blaze', extra: { blazeAndroidPreview } } : {}),
   ios: {
     ...app.expo.ios,
     bundleIdentifier: identity,

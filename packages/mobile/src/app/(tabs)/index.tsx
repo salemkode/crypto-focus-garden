@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { AccessibilityInfo, Alert, Platform, Pressable, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import Constants from 'expo-constants';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { seedOf } from '@focus-garden/garden/valley';
 import { ValleyView } from '../../components/valley/ValleyView';
@@ -35,7 +36,9 @@ export default function FocusScreen() {
   const reward = { name: levelName(levelForSeconds(length)) };
   const size = reward.name.toLowerCase();
   const linked = Boolean(rewards.recipient);
-  const localPreview = Platform.OS === 'web' && process.env.EXPO_PUBLIC_GARDEN_WEB_PREVIEW === '1' && !linked;
+  const webPreview = Platform.OS === 'web' && process.env.EXPO_PUBLIC_GARDEN_WEB_PREVIEW === '1';
+  const androidPreview = Platform.OS === 'android' && Constants.expoConfig?.extra?.blazeAndroidPreview === true && !isMainnet;
+  const localPreview = !linked && (webPreview || androidPreview);
   const canPlant = linked || localPreview;
   const canVerify = Boolean(rewards.account && linked && rewards.data.state === 'connected');
   // An unresolved wallet operation blocks a new plant, so the session would not be verified.
