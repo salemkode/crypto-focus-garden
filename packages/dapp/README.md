@@ -1,1 +1,0 @@
-A react-next dApp template which uses the contracts developed in `contracts` package
