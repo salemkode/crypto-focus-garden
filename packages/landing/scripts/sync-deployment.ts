@@ -5,7 +5,7 @@
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
-const network = process.env.LANDING_NETWORK ?? "chipnet";
+const network = process.env.LANDING_NETWORK ?? "mainnet";
 const source = new URL(`../../contracts/deployments/${network}.json`, import.meta.url);
 const target = new URL("../src/deployment.json", import.meta.url);
 

@@ -8,11 +8,11 @@ export const DOWNLOADS = {
 	/** Android download (AppDrop share link for the release APK). */
 	android: "https://appdrop.app/d/njfetdhs4s",
 	/** Web version of the app (Expo web build). */
-	web: "https://focus-garden-app.netlify.app",
+	web: "https://focus-app.salemkode.com",
 } as const;
 
 /** Shown in the footer and FAQ. Switch to "mainnet" only after a mainnet deployment. */
-export const NETWORK: "chipnet" | "mainnet" = "chipnet";
+export const NETWORK: "chipnet" | "mainnet" = "mainnet";
 
 export const EXPLORER = {
 	chipnet: { tx: "https://chipnet.imaginary.cash/tx/", address: "https://chipnet.imaginary.cash/address/" },

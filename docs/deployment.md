@@ -56,12 +56,22 @@ bun run landing:build   # static files in packages/landing/dist
 
 ## 3. Where things are live
 
-| What | URL | How it is updated |
+Everything is hosted on Cloudflare (account "Salem.m.s2030@gmail.com's Account", zone salemkode.com) as assets-only Workers, deployed with the `cf` CLI (1.0 or later):
+
+| What | URL | Deploy |
 |---|---|---|
-| Landing page | https://focus-garden-bch.netlify.app | `bun run landing:build`, then `npx netlify-cli deploy --prod --no-build --dir packages/landing/dist --site focus-garden-bch` |
-| Web app (Expo web export) | https://focus-garden-app.netlify.app | `cd packages/mobile && npx expo export --platform web --output-dir dist-web`, add `dist-web/_redirects` with `/*  /index.html  200`, then `npx netlify-cli deploy --prod --no-build --dir dist-web --site focus-garden-app` |
-| Web prototype (packages/dapp) | earnest-pudding-aaf5c6 (custom domain focus.salemkode.com) | Netlify builds it from `master` using the root `netlify.toml` |
+| Landing page | https://focus.salemkode.com | `cd packages/landing && bun run build && cf deploy ./dist` (config: `packages/landing/cloudflare.config.ts`, Worker `focus-garden`) |
+| Web app (Expo web export) | https://focus-app.salemkode.com | `cd packages/mobile && npx expo export --platform web --output-dir dist-web`, then `cd ../../deploy/web-app && cf deploy ../../packages/mobile/dist-web` (Worker `focus-garden-app`, single-page-app fallback) |
+| iPhone | https://appdrop.app/d/prvhsh4gyx | `packages/mobile/scripts/appdrop.sh <next build number>` |
+| Android | https://appdrop.app/d/njfetdhs4s | `./gradlew assembleRelease` in `packages/mobile/android`, then `npx appdrop app-release.apk --update https://appdrop.app/d/njfetdhs4s` |
 
-`--no-build` matters: without it the Netlify CLI applies the repository's Next.js plugin to these static folders and fails.
+The landing page reads the public deployment record (`packages/contracts/deployments/mainnet.json`) at build time and the leaderboard live from public Electrum servers. Netlify is no longer used for hosting.
 
-The `focus.salemkode.com` DNS record currently points at another Netlify site (the brainware one), so the domain shows a certificate error. It is managed in the Cloudflare account that owns salemkode.com; point its CNAME at the site that should own the domain.
+## 4. Mainnet deployment (19 November 2026)
+
+| | Category | Contract address |
+|---|---|---|
+| Focus Forest | `0949e4d7094966ac9e0bedceb8cde8a92d2d53e79fd9efe6686376e640ea3401` | `bitcoincash:pvh9q4ts2wngk5ts44eyjvu6r6uzswlf5qlmg78tzhacva9luc47se32m43xj` |
+| Focus Directory | `9edee153596de9b8c370e728b9ded8696a9fa094e6f1a0ca8de2dd5d74b3ee8f` | `bitcoincash:pwa4g6w9xflqxk98yynjhwkxyu5dagzzc2e89v2qzc4p09yvuf6aje3m0fs2u` |
+
+All four transactions are in `packages/contracts/deployments/mainnet.json`; each minting baton was verified on chain inside its contract. The deployer wallet keeps the unused funds.
