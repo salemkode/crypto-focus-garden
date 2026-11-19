@@ -17,7 +17,6 @@ smaller ones merge into bigger ones.
 | `packages/contracts` | CashScript contracts: `FocusForest` (locks and grows trees), `FocusDirectory` (public profiles), and the earlier `PomodoroRewards`. |
 | `packages/protocol` | Shared rules: reward sizes, tree styles and the on-chain data format. |
 | `packages/service` | The garden service that pays network fees for planting and claiming, with an operator-owned BCHN node. |
-| `packages/dapp` | The original Next.js web prototype (legacy). |
 
 Inside the app:
 
