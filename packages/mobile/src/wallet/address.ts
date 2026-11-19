@@ -2,6 +2,7 @@ import { sha256 } from "@noble/hashes/sha256";
 import { ripemd160 } from "@noble/hashes/ripemd160";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
+import { PREFIX } from "../services/network";
 
 // CashAddr uses a 40-bit checksum; BigInt works in Hermes and avoids Node/WASM.
 const alphabet = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
@@ -65,7 +66,7 @@ const prefixValues = (prefix: string) =>
   [...prefix].map((char) => char.charCodeAt(0) & 31).concat(0);
 export function addressFromPublicKey(
   publicKey: Uint8Array,
-  prefix = "bchtest",
+  prefix: string = PREFIX,
 ) {
   const hash = ripemd160(sha256(publicKey));
   const payload = convert([0, ...hash], 8, 5, true);
@@ -84,8 +85,8 @@ export function parseRewardAddress(address: string) {
     throw new Error("Use an address with consistent casing");
   const normalized = address.toLowerCase();
   const [prefix, encoded, extra] = normalized.split(":");
-  if (extra || prefix !== "bchtest" || !encoded || encoded.length !== 42)
-    throw new Error("Use a full Chipnet address that starts with bchtest:");
+  if (extra || prefix !== PREFIX || !encoded || encoded.length !== 42)
+    throw new Error(`Use a full address that starts with ${PREFIX}:`);
   const values = [...encoded].map((char) => alphabet.indexOf(char));
   if (
     values.some((value) => value < 0) ||

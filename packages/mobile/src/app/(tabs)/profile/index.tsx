@@ -18,11 +18,12 @@ import { fetchProfile } from '../../../services/community';
 import { readDisplayName, saveDisplayName } from '../../../features/profile/local';
 import { forestTrees } from '../../../services/garden';
 import { readLinkInfo } from '../../../features/wallet-link/useWalletLink';
+import { IS_MAINNET, MONEY_NOTE } from '../../../services/network';
 import { Button, color, Field, Group, Icon, icons, nativeAware, Notice, Row, Screen, Segmented, Stage, Stats } from '../../../ui';
 
 const WALLET_KINDS = [{ id: 'xo', label: 'Recovery phrase' }, { id: 'foundation', label: 'Early key' }] as const;
 
-const short = (address: string) => `${address.replace('bchtest:', '').slice(0, 6)}…${address.slice(-4)}`;
+const short = (address: string) => `${address.replace(/^[a-z]+:/, '').slice(0, 6)}…${address.slice(-4)}`;
 
 export default function ProfileScreen() {
   const rewards = useRewards();
@@ -80,7 +81,7 @@ export default function ProfileScreen() {
   const isPublic = profile?.state === 'public';
   const status = isPublic ? 'Public profile' : profile?.state === 'pending' ? 'Confirming profile' : 'Private';
   const fees = rewards.data.state === 'connected'
-    ? `Focus Garden wallet: ${rewards.data.creditSatoshis.toLocaleString()} sats for network fees.`
+    ? `Focus Garden wallet: ${rewards.data.balanceSatoshis.toLocaleString()} sats for network fees.`
     : 'The Focus Garden wallet pays network fees for your trees.';
 
   return <Screen title="Profile">
@@ -131,7 +132,7 @@ export default function ProfileScreen() {
     </Group>
 
     <AdvancedSection />
-    <Text className="text-center text-footnote text-ink-2">Focus Garden {Constants.expoConfig?.version ?? ''} on Chipnet, the Bitcoin Cash test network</Text>
+    <Text className="text-center text-footnote text-ink-2">Focus Garden {Constants.expoConfig?.version ?? ''} on {IS_MAINNET ? 'Bitcoin Cash' : 'Chipnet, the Bitcoin Cash test network'}</Text>
   </Screen>;
 }
 
@@ -142,11 +143,11 @@ const PublicProfile = nativeAware(function PublicProfile({ initiallyOpen, displa
   const rewards = useRewards();
   const [open, setOpen] = useState(initiallyOpen);
   const [about, setAbout] = useState('');
-  // Joining writes a public, permanent name on Bitcoin Cash and spends test coins: one confirm, as
+  // Joining writes a public, permanent name on Bitcoin Cash and spends from the app wallet: one confirm, as
   // for plant, send, merge and tip, saying exactly what happens and what it costs.
   function confirmJoin() {
     const name = displayName.trim();
-    Alert.alert(`Join as ${name}?`, `Your name is written on Bitcoin Cash for everyone to see, and can't be changed later.\n\nCost: a 2,000-sat network fee, plus 1,000 sats kept in your profile card in your Focus Garden wallet, in test coins with no cash value.`, [
+    Alert.alert(`Join as ${name}?`, `Your name is written on Bitcoin Cash for everyone to see, and can't be changed later.\n\nCost: a 2,000-sat network fee, plus 1,000 sats kept in your profile card in your Focus Garden wallet, ${MONEY_NOTE}.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Join', onPress: () => { void rewards.transact({ action: 'register', name, about: about.trim() }).then(onJoined); } },
     ]);
@@ -166,7 +167,6 @@ const PublicProfile = nativeAware(function PublicProfile({ initiallyOpen, displa
 const AdvancedSection = nativeAware(function AdvancedSection() {
   const rewards = useRewards();
   const [open, setOpen] = useState(false);
-  const [credential, setCredential] = useState('');
   return <>
     <Group>
       <Row title="Advanced" value={open ? 'Hide' : undefined} onPress={() => setOpen(!open)} chevron={!open} />
@@ -175,8 +175,6 @@ const AdvancedSection = nativeAware(function AdvancedSection() {
       {rewards.account ? <Group>
         <Row title="Restore a Focus Garden wallet" onPress={() => router.push('/restore-wallet')} chevron />
       </Group> : null}
-      <Field label="Garden access key" helper="Stored in this phone's secure storage." secureTextEntry autoComplete="off" textContentType="none" importantForAutofill="no" value={credential} onChangeText={setCredential} autoCorrect={false} autoCapitalize="none" placeholder="64 characters" />
-      <Button variant="secondary" label="Save access key" disabled={rewards.status !== 'ready' || !credential.trim()} onPress={async () => { await rewards.transact({ action: 'credential', token: credential }); setCredential(''); }} />
       <Group title="Focus Garden wallet type" footer="Early test versions used a single key. Both stay available and neither is overwritten.">
         <Segmented options={WALLET_KINDS} value={rewards.account?.kind ?? 'xo'} disabled={rewards.pending !== null || rewards.status !== 'ready'} onChange={(kind) => rewards.selectWallet(kind).catch(() => undefined)} />
       </Group>

@@ -40,7 +40,7 @@ export function startWizardConnect(): Pairing {
     manager.once('walletready', () => {
       const publicKey = manager.getPubkey(RECEIVE, 0n);
       if (!publicKey) { reject(new Error('The wallet did not share a receive address.')); close('No receive address.'); return; }
-      resolve({ address: addressFromPublicKey(publicKey, 'bchtest'), walletName: manager.walletName || 'your wallet', method: 'wizardconnect' });
+      resolve({ address: addressFromPublicKey(publicKey), walletName: manager.walletName || 'your wallet', method: 'wizardconnect' });
       close('Linked to Focus Garden.');
     });
     manager.once('disconnect', (_reason, message) => { reject(new Error(message || 'The wallet closed the connection.')); close(); });

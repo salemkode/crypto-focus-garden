@@ -10,6 +10,7 @@ import { useSelectedMember } from '../services/community';
 import { SESSION_STEP } from '../features/focus/catalog';
 import { formatDuration } from '../features/focus/stats';
 import { Button, EmptyState, Group, icons, numerals, Screen, Segmented, Stage, Stats } from '../ui';
+import { MONEY_NOTE } from '../services/network';
 
 const AMOUNTS = [1000, 5000, 20000] as const;
 const AMOUNT_OPTIONS = AMOUNTS.map((value) => ({ id: String(value), label: `${value.toLocaleString()} sats` }));
@@ -32,7 +33,7 @@ export default function MemberSheet() {
   const canTip = Boolean(member.tipAddress) && rewards.status === 'ready' && Boolean(rewards.account) && !rewards.pending;
   function tip() {
     void Haptics.selectionAsync();
-    Alert.alert(`Tip ${member!.name}?`, `${amount.toLocaleString()} sats go straight to ${member!.name}'s wallet from your Focus Garden wallet, plus a 2,000-sat network fee. Test coins have no cash value.`, [
+    Alert.alert(`Tip ${member!.name}?`, `${amount.toLocaleString()} sats go straight to ${member!.name}'s wallet from your Focus Garden wallet, plus a 2,000-sat network fee, ${MONEY_NOTE}.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Send tip', onPress: () => {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

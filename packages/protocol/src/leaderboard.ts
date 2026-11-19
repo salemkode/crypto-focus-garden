@@ -2,11 +2,11 @@ import { binToHex, cashAddressToLockingBytecode, decodeTransaction, sha256, hexT
 import { ABOUT_PREFIX, parseProfile, parseTree, planterTag } from './forest';
 
 /**
- * The verified-focus leaderboard, computed from the chain alone (no garden service).
+ * The verified-focus leaderboard, computed on the device from the chain alone.
  *
  * Every planting spends the Focus Forest minting baton and creates a locked tree at the
  * contract; every profile card spends the Focus Directory baton. So the two contract
- * addresses' histories hold the whole game. Rules match packages/service/src/api.ts:
+ * addresses' histories hold the whole game. Rules:
  * opt-in members only, a planted tree scores its tier's points, merges add nothing.
  */
 

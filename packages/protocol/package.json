@@ -7,16 +7,25 @@
     ".": "./src/index.ts",
     "./policy": "./src/policy.ts",
     "./signing": "./src/signing.ts",
-    "./recovery": "./src/recovery.ts",
     "./forest": "./src/forest.ts",
-    "./leaderboard": "./src/leaderboard.ts"
+    "./leaderboard": "./src/leaderboard.ts",
+    "./network": "./src/network.ts",
+    "./chain": "./src/chain.ts",
+    "./build": "./src/build.ts",
+    "./garden": "./src/garden.ts"
   },
   "dependencies": {
     "@bitauth/libauth": "3.1.0-next.8",
     "effect": "^4.1.2",
-    "zod": "^4.6.7"
+    "zod": "^4.6.7",
+    "cashscript": "0.13.0-next.1"
   },
   "scripts": {
-    "test": "bun test test"
+    "test": "bun test test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "~6.0.3"
   }
 }

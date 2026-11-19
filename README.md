@@ -13,9 +13,9 @@ tree withers. Verified sessions are locked on Bitcoin Cash, and the grown tree i
 wallet as a collectible. Longer focus grows bigger trees (sprout, tree, big tree, house), and
 smaller ones merge into bigger ones.
 
-> Status: live on Bitcoin Cash **mainnet** (contracts in
-> [`packages/contracts/deployments/mainnet.json`](packages/contracts/deployments/mainnet.json)).
-> Development and testing also run on Chipnet, the test network.
+> There is no Focus Garden server. The app talks to Bitcoin Cash directly through public Electrum
+> servers, and the contracts on chain are the whole backend. The contracts are live on mainnet
+> ([`packages/contracts/deployments/mainnet.json`](packages/contracts/deployments/mainnet.json)).
 
 ## Before and after (2025 hackathon → now)
 
@@ -44,15 +44,14 @@ This year we solved that and rebuilt the product around it.
 | [`packages/mobile`](packages/mobile/README.md) | The app: Expo SDK 58, React Native 0.88, Expo Router. iOS, Android and web from one codebase. |
 | `packages/garden` | The voxel world: tree and house models, the floating valley, seasons and camera. Shared by native and web. |
 | `packages/contracts` | CashScript contracts: `FocusForest` (locks and grows trees), `FocusDirectory` (public profiles), and the earlier `PomodoroRewards`. |
-| `packages/protocol` | Shared rules: reward sizes, tree styles and the on-chain data format. |
-| `packages/service` | The garden service that pays network fees for planting and claiming, with an operator-owned BCHN node. |
+| `packages/protocol` | Shared rules and the on-device chain code: reward sizes, tree styles, the on-chain data format, transaction building, garden reading and the leaderboard. |
 
 Inside the app:
 
 - **Focus:** pick a length and a tree style, plant, and stay. The tree withers if you leave for more than 10 seconds.
 - **App blocking:** Screen Time on iOS and a usage-access guard on Android block chosen apps while a tree grows.
 - **Verified trees:** a session can be locked in the Focus Forest contract. When the lock matures, the tree is released to the wallet you linked.
-- **Wallets:** link your own wallet (Selene, Paytaca, WalletConnect, WizardConnect, or a pasted address). A separate on-device Focus Garden wallet only pays network fees.
+- **Wallets:** link your own wallet (Selene, Paytaca, WalletConnect, WizardConnect, or a pasted address). A separate on-device Focus Garden wallet pays the network fees; you fund it with a little BCH.
 - **Leaders and stats:** a leaderboard of verified focus, tips by name, and your own focus history.
 
 ## Getting started
@@ -76,10 +75,8 @@ Expo Go is not supported; the app needs a development build because it ships nat
 - [Focus Forest v5 product and contract rules](docs/focus-forest-v5.md) (v4: [docs/focus-forest-v4.md](docs/focus-forest-v4.md))
 - [Valley design](docs/valley-design.md)
 - [Hybrid wallet architecture](docs/native-hybrid-wallet.md) and [wallet linking](docs/wallet-linking.md)
-- [Garden service](docs/funding-service.md)
 - [Garden rules and migration](docs/garden-rules-and-migration.md)
 - [Expo consolidation](docs/expo-consolidation.md)
-- [Chipnet acceptance procedure](docs/chipnet-acceptance.md)
 
 ## License
 

@@ -15,14 +15,14 @@ bun run mobile:ios --device <UDID>
 bun run mobile:android --device <SERIAL>
 ```
 
-Copy `.env.example` to `.env.local` and fill in the public garden service settings. Only public
-values belong there: never put private keys or account credentials in `EXPO_PUBLIC_*` variables.
+There is no server to configure: the app reads and writes the shared contracts directly through public
+Electrum servers, using the deployment record committed in `packages/contracts/deployments`. Optional
+public settings go in `.env.local` (see `.env.example`); never put private keys in `EXPO_PUBLIC_*` variables.
 
 | Variable | Purpose |
 |---|---|
-| `EXPO_PUBLIC_GARDEN_API_URL` | Garden service URL (HTTPS; release builds refuse HTTP) |
-| `EXPO_PUBLIC_GARDEN_CONTRACT_BYTECODE`, `EXPO_PUBLIC_GARDEN_CATEGORY` | The deployed contract the app trusts |
-| `EXPO_PUBLIC_GARDEN_GENESIS_HASH`, `..._CHECKPOINT_HEIGHT`, `..._CHECKPOINT_HASH`, `..._MIN_CONFIRMATIONS` | Chain identity and confirmation policy |
+| `EXPO_PUBLIC_FOCUS_NETWORK` | Which deployment record to use (`mainnet`, the default) |
+| `EXPO_PUBLIC_ELECTRUM_SERVER` | Optional: one Electrum server hostname instead of the public list |
 | `EXPO_PUBLIC_VALLEY_RENDERER` | `filament` (default, native) or `webview` (three.js) |
 | `EXPO_PUBLIC_VALLEY_STATS=1` | Shows the valley's frame-rate overlay (off by default) |
 
