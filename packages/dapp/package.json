@@ -16,9 +16,9 @@
     "@mainnet-cash/bcmr": "^2.7.24",
     "@tanstack/react-query": "^5.90.10",
     "blockies": "^0.0.2",
-    "next": "16.0.1",
-    "react": "19.2.0",
-    "react-dom": "19.2.0",
+    "next": "16.0.11",
+    "react": "19.2.9",
+    "react-dom": "19.2.9",
     "three": "0.181.1",
     "@focus-garden/garden": "workspace:*"
   },
@@ -30,7 +30,7 @@
     "@types/three": "^0.181.0",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
-    "eslint-config-next": "16.0.1",
+    "eslint-config-next": "16.0.11",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
