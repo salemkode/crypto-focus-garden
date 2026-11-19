@@ -53,3 +53,15 @@ bun run landing:build   # static files in packages/landing/dist
 - Download links live in `packages/landing/src/config.ts`. An empty link shows "Coming soon" instead of a dead button. The visitor's platform is offered first.
 - The build copies the public deployment record from `packages/contracts/deployments/chipnet.json`, so the contracts section fills itself in after step 1.
 - `dist` is plain HTML, CSS, JS and images. Any static host works (Cloudflare Pages, GitHub Pages, Netlify).
+
+## 3. Where things are live
+
+| What | URL | How it is updated |
+|---|---|---|
+| Landing page | https://focus-garden-bch.netlify.app | `bun run landing:build`, then `npx netlify-cli deploy --prod --no-build --dir packages/landing/dist --site focus-garden-bch` |
+| Web app (Expo web export) | https://focus-garden-app.netlify.app | `cd packages/mobile && npx expo export --platform web --output-dir dist-web`, add `dist-web/_redirects` with `/*  /index.html  200`, then `npx netlify-cli deploy --prod --no-build --dir dist-web --site focus-garden-app` |
+| Web prototype (packages/dapp) | earnest-pudding-aaf5c6 (custom domain focus.salemkode.com) | Netlify builds it from `master` using the root `netlify.toml` |
+
+`--no-build` matters: without it the Netlify CLI applies the repository's Next.js plugin to these static folders and fails.
+
+The `focus.salemkode.com` DNS record currently points at another Netlify site (the brainware one), so the domain shows a certificate error. It is managed in the Cloudflare account that owns salemkode.com; point its CNAME at the site that should own the domain.
