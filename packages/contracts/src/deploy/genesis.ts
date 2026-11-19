@@ -7,13 +7,26 @@ import { Contract, TransactionBuilder, type Artifact, type NetworkProvider, type
  * CashTokens creates a new token category when a transaction spends an output with index 0;
  * the category id is that output's transaction id. Each contract therefore needs:
  *   1. prep:    the deployer pays itself, creating a fresh output 0;
- *   2. genesis: that output 0 is spent and the minting baton is sent straight into the contract.
+ *   2. genesis: that output 0 is spent, creating the category.
  * Every user's app then points at the same category and contract address, so all trees and
  * profile cards share one collection.
+ *
+ * Genesis layout (BCMR authchain safe):
+ *   output 0  identity output: plain BCH to the metadata authority key. The category's authchain
+ *             (BCMR) continues only through output 0, so only that key can publish metadata.
+ *   output 1  minting baton, locked in the contract. Plant transactions spend it, but they are
+ *             not part of the authchain, so planters cannot change the collection's metadata.
+ *   then      creator NFTs, the deployer's change and the OP_RETURN BCMR publication.
+ * Both prep transactions are built first, so both category ids (and therefore the registry
+ * text and its hash) are known before either genesis transaction is signed.
  */
 export const BATON_SATOSHIS = 1000n;
 export const STEP_FEE_SATOSHIS = 1000n;
 export const DUST_SATOSHIS = 546n;
+/** Plain BCH on the identity output that carries the BCMR authchain. */
+export const IDENTITY_SATOSHIS = 1000n;
+/** Split off in the Focus Forest prep transaction to fund the Focus Directory deployment. */
+export const DIRECTORY_FUNDING_SATOSHIS = 10000n;
 /** Value carried by each creator NFT output (above the CashTokens dust limit). */
 export const CREATOR_NFT_SATOSHIS = 1000n;
 
@@ -24,6 +37,17 @@ export interface CreatorMint {
 }
 
 export const transactionIdOf = (raw: string) => binToHex(hash256(hexToBin(raw)).reverse());
+
+/**
+ * Builds the BCMR publication for the two new categories: the OP_RETURN locking bytecode
+ * (`6a 04 "BCMR" 20 <sha256> <uri>`) plus the hash and URI it carries.
+ */
+export type Publish = (categories: { forest: string; directory: string }) => { bytecode: string; contentHash: string; uri: string };
+export interface Identity {
+	/** P2PKH address that receives each genesis output 0 and so controls future BCMR updates. */
+	authority: string;
+	publish?: Publish;
+}
 
 export interface Step {
 	name: string;
@@ -37,38 +61,48 @@ export function contractAt(artifact: Artifact, category: string, provider: Netwo
 	return new Contract(artifact, [hexToBin(category).reverse()], { provider, addressType: "p2sh32" });
 }
 
-/** Pays the deployer's plain coins back to itself as output 0. */
-export function buildPrep(provider: NetworkProvider, signer: SignatureTemplate, address: string, coins: Utxo[], name: string) {
+/** Pays the deployer's plain coins back to itself as output 0, optionally splitting `split` sats into output 1. */
+export function buildPrep(provider: NetworkProvider, signer: SignatureTemplate, address: string, coins: Utxo[], name: string, split = 0n) {
 	const plain = coins.filter((coin) => !coin.token);
 	const total = plain.reduce((sum, coin) => sum + coin.satoshis, 0n);
-	if (plain.length === 0 || total - STEP_FEE_SATOSHIS < DUST_SATOSHIS) throw new Error("Not enough plain BCH to prepare the deployment.");
+	const main = total - STEP_FEE_SATOSHIS - split;
+	if (plain.length === 0 || main < DUST_SATOSHIS || (split && split < DUST_SATOSHIS)) throw new Error("Not enough plain BCH to prepare the deployment.");
 	const builder = new TransactionBuilder({ provider });
 	plain.forEach((coin) => builder.addInput(coin, signer.unlockP2PKH()));
-	builder.addOutput({ to: address, amount: total - STEP_FEE_SATOSHIS });
+	builder.addOutput({ to: address, amount: main });
+	if (split) builder.addOutput({ to: address, amount: split });
 	const raw = builder.build();
 	const txid = transactionIdOf(raw);
-	return { step: { name, raw, txid } satisfies Step, output: { txid, vout: 0, satoshis: total - STEP_FEE_SATOSHIS } satisfies Utxo };
+	return {
+		step: { name, raw, txid } satisfies Step,
+		output: { txid, vout: 0, satoshis: main } satisfies Utxo,
+		rest: split ? ({ txid, vout: 1, satoshis: split } satisfies Utxo) : undefined,
+	};
 }
 
 /**
- * Spends an output 0 to create a category and locks its minting baton in the contract.
- * Optionally mints creator NFTs (immutable, so they behave like claimed trees) in the same
- * transaction. The fee grows with the transaction size (about 1.1 sat per byte).
+ * Spends an output 0 to create a category: identity output 0 to the authority, the minting baton
+ * locked in the contract at output 1, optional creator NFTs (immutable, so they behave like
+ * claimed trees), the deployer's change and an optional BCMR publication.
+ * The fee grows with the transaction size (about 1.1 sat per byte).
  */
-export function buildGenesis(provider: NetworkProvider, signer: SignatureTemplate, address: string, coin: Utxo, artifact: Artifact, name: string, creator?: CreatorMint) {
+export function buildGenesis(provider: NetworkProvider, signer: SignatureTemplate, address: string, coin: Utxo, artifact: Artifact, name: string, identity: { authority: string; publication?: string }, creator?: CreatorMint) {
 	if (coin.vout !== 0 || coin.token) throw new Error("Genesis must spend a plain output with index 0.");
 	const category = coin.txid;
 	const contract = contractAt(artifact, category, provider);
 	const minted = creator?.commitments ?? [];
 	for (const commitment of minted) if (!/^[0-9a-f]{2,80}$/.test(commitment) || commitment.length % 2) throw new Error(`Invalid NFT commitment: ${commitment}`);
+	if (identity.publication && !/^6a0442434d5220[0-9a-f]{64}/.test(identity.publication)) throw new Error("The publication must be an OP_RETURN BCMR output.");
 	const build = (fee: bigint) => {
-		const change = coin.satoshis - BATON_SATOSHIS - BigInt(minted.length) * CREATOR_NFT_SATOSHIS - fee;
-		if (change < DUST_SATOSHIS) throw new Error("Not enough BCH for the minting baton, creator NFTs and fee.");
+		const change = coin.satoshis - IDENTITY_SATOSHIS - BATON_SATOSHIS - BigInt(minted.length) * CREATOR_NFT_SATOSHIS - fee;
+		if (change < DUST_SATOSHIS) throw new Error("Not enough BCH for the identity output, minting baton, creator NFTs and fee.");
 		const builder = new TransactionBuilder({ provider })
 			.addInput(coin, signer.unlockP2PKH())
+			.addOutput({ to: plainAddress(identity.authority), amount: IDENTITY_SATOSHIS })
 			.addOutput({ to: contract.tokenAddress, amount: BATON_SATOSHIS, token: { category, amount: 0n, nft: { capability: "minting", commitment: "" } } });
 		for (const commitment of minted) builder.addOutput({ to: tokenAddress(creator!.address), amount: CREATOR_NFT_SATOSHIS, token: { category, amount: 0n, nft: { capability: "none", commitment } } });
 		builder.addOutput({ to: address, amount: change });
+		if (identity.publication) builder.addOutput({ to: hexToBin(identity.publication), amount: 0n });
 		return { raw: builder.build(), change };
 	};
 	const draft = build(STEP_FEE_SATOSHIS);
@@ -77,9 +111,19 @@ export function buildGenesis(provider: NetworkProvider, signer: SignatureTemplat
 	const txid = transactionIdOf(raw);
 	return {
 		step: { name, raw, txid } satisfies Step,
-		change: { txid, vout: 1 + minted.length, satoshis: change } satisfies Utxo,
-		deployment: { category, address: contract.address, tokenAddress: contract.tokenAddress, lockingBytecode: lockingBytecodeOf(contract.address), batonOutpoint: `${txid}:0`, creatorNfts: minted.length },
+		change: { txid, vout: 2 + minted.length, satoshis: change } satisfies Utxo,
+		deployment: { category, address: contract.address, tokenAddress: contract.tokenAddress, lockingBytecode: lockingBytecodeOf(contract.address), batonOutpoint: `${txid}:1`, identityOutpoint: `${txid}:0`, creatorNfts: minted.length },
 	};
+}
+
+/** The identity output must stay plain BCH at a P2PKH address. */
+function plainAddress(address: string) {
+	const decoded = cashAddressToLockingBytecode(address);
+	if (typeof decoded === "string") throw new Error(decoded);
+	if (!/^76a914[0-9a-f]{40}88ac$/.test(binToHex(decoded.bytecode))) throw new Error("The metadata authority must be a P2PKH address.");
+	const result = lockingBytecodeToCashAddress({ bytecode: decoded.bytecode, prefix: decoded.prefix, tokenSupport: false });
+	if (typeof result === "string") throw new Error(result);
+	return result.address;
 }
 
 function tokenAddress(address: string) {
@@ -131,14 +175,45 @@ function lockingBytecodeOf(address: string) {
 }
 
 /** Builds the full chain of four transactions for Focus Forest and Focus Directory. */
-export function planDeployment(provider: NetworkProvider, signer: SignatureTemplate, address: string, coins: Utxo[], artifacts: { forest: Artifact; directory: Artifact }, creator?: CreatorMint) {
-	const forestPrep = buildPrep(provider, signer, address, coins, "forest-prep");
-	const forest = buildGenesis(provider, signer, address, forestPrep.output, artifacts.forest, "forest-genesis", creator);
-	const directoryPrep = buildPrep(provider, signer, address, [forest.change], "directory-prep");
-	const directory = buildGenesis(provider, signer, address, directoryPrep.output, artifacts.directory, "directory-genesis");
+export function planDeployment(provider: NetworkProvider, signer: SignatureTemplate, address: string, coins: Utxo[], artifacts: { forest: Artifact; directory: Artifact }, identity: Identity, creator?: CreatorMint) {
+	const forestPrep = buildPrep(provider, signer, address, coins, "forest-prep", DIRECTORY_FUNDING_SATOSHIS);
+	const directoryPrep = buildPrep(provider, signer, address, [forestPrep.rest!], "directory-prep");
+	const categories = { forest: forestPrep.step.txid, directory: directoryPrep.step.txid };
+	const published = identity.publish?.(categories);
+	const publication = published?.bytecode;
+	const forest = buildGenesis(provider, signer, address, forestPrep.output, artifacts.forest, "forest-genesis", { authority: identity.authority, publication }, creator);
+	const directory = buildGenesis(provider, signer, address, directoryPrep.output, artifacts.directory, "directory-genesis", { authority: identity.authority, publication });
 	return {
-		steps: [forestPrep.step, forest.step, directoryPrep.step, directory.step],
+		steps: [forestPrep.step, directoryPrep.step, forest.step, directory.step],
 		forest: forest.deployment,
 		directory: directory.deployment,
+		publication: published,
 	};
+}
+
+/**
+ * A BCMR metadata update: spends the category's identity output (held by the metadata authority)
+ * and creates the next one at output 0, extending the authchain, with the new publication at
+ * output 1. The deployer's coins pay the fee and get the change at output 2.
+ */
+export function buildPublication(provider: NetworkProvider, authority: { signer: SignatureTemplate; address: string }, identity: Utxo, funder: { signer: SignatureTemplate; address: string }, coins: Utxo[], publication: string, name: string) {
+	if (identity.token) throw new Error("The identity output must be plain BCH.");
+	if (!/^6a0442434d5220[0-9a-f]{64}/.test(publication)) throw new Error("The publication must be an OP_RETURN BCMR output.");
+	const plain = coins.filter((coin) => !coin.token);
+	const funding = plain.reduce((sum, coin) => sum + coin.satoshis, 0n);
+	const build = (fee: bigint) => {
+		const change = identity.satoshis + funding - IDENTITY_SATOSHIS - fee;
+		if (change < DUST_SATOSHIS) throw new Error("Not enough BCH to pay for the metadata update.");
+		const builder = new TransactionBuilder({ provider }).addInput(identity, authority.signer.unlockP2PKH());
+		plain.forEach((coin) => builder.addInput(coin, funder.signer.unlockP2PKH()));
+		builder.addOutput({ to: plainAddress(authority.address), amount: IDENTITY_SATOSHIS });
+		builder.addOutput({ to: hexToBin(publication), amount: 0n });
+		builder.addOutput({ to: funder.address, amount: change });
+		return { raw: builder.build(), change };
+	};
+	const draft = build(STEP_FEE_SATOSHIS);
+	const fee = [STEP_FEE_SATOSHIS, BigInt(Math.ceil((draft.raw.length / 2) * 1.1))].reduce((a, b) => (a > b ? a : b));
+	const { raw, change } = fee === STEP_FEE_SATOSHIS ? draft : build(fee);
+	const txid = transactionIdOf(raw);
+	return { step: { name, raw, txid } satisfies Step, identity: { txid, vout: 0, satoshis: IDENTITY_SATOSHIS } satisfies Utxo, change: { txid, vout: 2, satoshis: change } satisfies Utxo };
 }

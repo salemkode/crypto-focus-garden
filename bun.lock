@@ -21,6 +21,7 @@
       "dependencies": {
         "@bch-wc2/cashscript-signer": "^0.0.15",
         "@bch-wc2/mainnet-js-signer": "^0.0.15",
+        "@focus-garden/protocol": "workspace:*",
         "zod": "^4.1.12",
       },
       "devDependencies": {

@@ -9,7 +9,8 @@
     "./signing": "./src/signing.ts",
     "./recovery": "./src/recovery.ts",
     "./forest": "./src/forest.ts",
-    "./leaderboard": "./src/leaderboard.ts"
+    "./leaderboard": "./src/leaderboard.ts",
+    "./bcmr": "./src/bcmr.ts"
   },
   "dependencies": {
     "@bitauth/libauth": "3.1.0-next.8",
