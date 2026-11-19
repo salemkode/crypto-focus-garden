@@ -1,4 +1,5 @@
 import { sha256 } from '@noble/hashes/sha2';
+import { focusMinutes, treeName } from '@focus-garden/protocol/bcmr';
 import { parseTree, speciesByCode, tierByCode, TREE_COMMITMENT, type ForestSpecies, type ForestTier } from '@focus-garden/protocol/forest';
 import type { SpeciesId } from '../focus/catalog';
 
@@ -12,11 +13,11 @@ export const NFT_STYLE_VERSION = 1;
 
 export type Rarity = 'common' | 'rare' | 'epic' | 'legendary';
 const RARITY: Record<ForestTier['key'], Rarity> = { sprout: 'common', tree: 'common', bigTree: 'rare', house: 'epic' };
-const SHORT: Record<ForestSpecies['key'], string> = { oak: 'Oak', cherry: 'Cherry', pine: 'Pine', maple: 'Maple', birch: 'Birch', cash: 'Cash' };
 /** Local catalogue ids for the same species (the 2D/3D renderers use these keys). */
 const LOCAL: Record<ForestSpecies['key'], SpeciesId> = { oak: 'oak', cherry: 'cherry', pine: 'pine', maple: 'maple', birch: 'birch', cash: 'cashtree' };
 
 export interface NftTree {
+  /** Same name wallets show, from the published BCMR registry (packages/protocol/src/bcmr.ts). */
   name: string;
   tier: ForestTier;
   species: ForestSpecies;
@@ -50,7 +51,8 @@ export function nftTree(commitment: string): NftTree {
   const bytes = sha256(hexToBytes(commitment.toLowerCase()));
   const rarity = RARITY[tier.key];
   return {
-    name: `${SHORT[species.key]} ${tier.name}`,
+    // The app shows merging in its traits, so the name leaves out the registry's "(merged)".
+    name: treeName(commitment.toLowerCase(), false)!,
     tier,
     species,
     localSpecies: LOCAL[species.key],
@@ -63,7 +65,7 @@ export function nftTree(commitment: string): NftTree {
     traits: [
       { label: 'Size', value: tier.name },
       { label: 'Style', value: species.name },
-      { label: 'Verified focus', value: parsed.merged ? `Merged · worth ${tier.points} focus units` : `${((parsed.units * 512) / 60).toFixed(1)} min lock` },
+      { label: 'Verified focus', value: parsed.merged ? `Merged · worth ${tier.points} focus units` : `${focusMinutes(parsed.units)} min lock` },
       { label: 'Rarity', value: rarity[0].toUpperCase() + rarity.slice(1) },
     ],
   };

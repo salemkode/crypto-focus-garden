@@ -102,6 +102,19 @@ export interface RegistryOptions {
 /** Tree pictures live at <site>/bcmr/trees/<tier>-<species>.png. */
 export const treeImagePath = (tierKey: string, speciesKey: string) => `/bcmr/trees/${tierKey}-${speciesKey}.png`;
 
+const typeName = (tier: (typeof FOREST_TIERS)[number], species: (typeof FOREST_SPECIES)[number], merged: boolean) =>
+  `${species.name} · ${tier.name}${merged ? ' (merged)' : ''}`;
+
+/**
+ * The name wallets show for a tree (from this registry), e.g. "Meadow Oak · Sprout", with
+ * " (merged)" for merged trees unless `markMerged` is false; null if not a tree.
+ */
+export function treeName(commitment: string, markMerged = true) {
+  const tree = parseTree(commitment);
+  if (!tree) return null;
+  return typeName(FOREST_TIERS[tree.tier - 1], FOREST_SPECIES[tree.species - 1], markMerged && tree.merged);
+}
+
 function treeTypes(site: string) {
   const types: Record<string, NftType> = {};
   for (const tier of FOREST_TIERS) {
@@ -111,7 +124,7 @@ function treeTypes(site: string) {
       const uris = { icon: picture, image: picture };
       const minimum = focusMinutes(tier.minUnits);
       types[look] = {
-        name: `${species.name} · ${tier.name}`,
+        name: typeName(tier, species, false),
         description: `A ${tier.name} grown from at least ${minimum} minutes of verified focus. Its deposit stays with the tree.`,
         fields: ['focus', 'planted'],
         uris,
@@ -120,7 +133,7 @@ function treeTypes(site: string) {
       if (tier.code > 1) {
         const from = FOREST_TIERS[tier.code - 2];
         types[`${look}6d`] = {
-          name: `${species.name} · ${tier.name} (merged)`,
+          name: typeName(tier, species, true),
           description: `A ${tier.name} grown by merging ${from.mergeCount} ${from.name}s. It carries their deposits.`,
           fields: ['lineage'],
           uris,

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { binToHex, createVirtualMachineBch2023, createVirtualMachineBch2026, hexToBin, sha256, utf8ToBin, type Output, type TransactionCommon } from '@bitauth/libauth';
 import {
   bcmrPublicationBytecode, buildRegistry, focusMinutes, FOREST_PARSE_BYTECODE, isRegistry, PROFILE_PARSE_BYTECODE, profileMetadata,
-  registryContentHash, serializeRegistry, treeMetadata, treeTypeKey,
+  registryContentHash, serializeRegistry, treeMetadata, treeName, treeTypeKey,
 } from '../src/bcmr';
 import { FOREST_SPECIES, FOREST_TIERS, mergedCommitment, plantedCommitment, profileCommitment } from '../src/forest';
 
@@ -58,6 +58,7 @@ describe('tree parse bytecode', () => {
       expect(error).toBeUndefined();
       expect(altstack).toEqual(['246d', merged.slice(66, 74)]);
       expect(treeTypeKey(merged)).toBe('246d');
+      expect(treeName(merged)).toBe('Ember Maple · Tree (merged)');
       expect(treeMetadata(registry, forestCategory, merged)).toMatchObject({ name: 'Ember Maple · Tree (merged)', focusMinutes: null });
     });
   }

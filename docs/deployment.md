@@ -69,13 +69,40 @@ The landing page reads the public deployment record (`packages/contracts/deploym
 
 ## 4. Mainnet deployment (19 November 2026)
 
-The live collection is **v2**: same contracts as v1, created again so its genesis transaction could mint the creator trees.
+The live collection is **v3**: same contracts as v1 and v2, created again so wallets show real metadata (BCMR) that only we can change.
 
 | | Category | Contract address |
 |---|---|---|
-| Focus Forest | `cd98a853ba5fa2758b773667d7a24dc75aad9b0e44d5fff860155377b67e04e1` | `bitcoincash:pwqv2hk4m9hs2n5lvsylsdymadt5cy8wvcjmxst3fyxmvpud705hg5pp2mugf` |
-| Focus Directory | `4bd83509d94f2013aaa576729be83b0287ac0df62c9ca56ae1c6b45629c65a06` | `bitcoincash:pvheta4rag6qfza50rz8vvemy5jhfle8uy5prnjz52g6zqc9aqs37jsngq48k` |
+| Focus Forest | `cb351f415f5cbf974e0f5f661cdccf5b83e1827a9135d9429316e30ca13d4ae1` | `bitcoincash:p0979gfv7ncn9dne6cwjrgw4479rq0kk7dyqm2ng3376zutcrkj776ftama5r` |
+| Focus Directory | `b4abb87c910f2489ea6ef1435dbc2e08074ddfc5a8424ec4a09bfa13054e795b` | `bitcoincash:pvvxgnrkuavnse76u4yc86wdg2vx94qjkw6c5ln20vwwveqzlg4x74zw0sgzw` |
 
-**Creator trees.** The Focus Forest genesis transaction (`e60e66507468691fc10fc79a3aaeef12564317fa146f4618408783a1165a496e`) minted 100 trees straight to the deployer wallet `bitcoincash:qr4f0lj3amfyqmmv30jsqt9wr25rm0znagfg22drch`, with no planting and no time lock: 16 Sprouts, 24 Trees, 30 Big trees and 30 Houses across all six styles. They use the normal tree format and are immutable, so they look and behave like claimed trees and can be sent to anyone. The leaderboard counts only trees planted through the contract, so they add no points. Command: `bun run deploy deploy --network mainnet --creator-nfts 100` (`--creator-address` picks another recipient).
+**Why v3.** In v2 the genesis transaction put the minting baton at output 0. A category's BCMR authchain follows output 0, so it ran through the contract, and every plant transaction extended it. The contract allows extra OP_RETURN outputs, so any planter could have published their own metadata and renamed the collection or swapped its pictures in every wallet. In v3, genesis output 0 is a plain 1,000-sat identity output on a dedicated **metadata authority** key (`~/.focus-garden/authority-mainnet.json`, address `bitcoincash:qrfa3wsch0upzxk2gaswlvsnj067sy42es2m7jhyhc`), and the baton moves to output 1. Plant transactions are no longer part of the authchain.
 
-All transactions are in `packages/contracts/deployments/mainnet.json`; batons and creator trees were verified on chain. The first collection (v1, `deployments/mainnet-v1.json`) was never used and is superseded.
+**Metadata (BCMR).** The registry is hosted at https://focus.salemkode.com/.well-known/bitcoin-cash-metadata-registry.json and built by `packages/protocol/src/bcmr.ts`.
+- **Collection:** both genesis transactions publish it, so wallets show "Focus Forest" with its icon.
+- **Parsable trees:** wallets that run the parse bytecode (Cashonize) show each tree's name (e.g. "Meadow Oak · Sprout"), verified focus minutes and planting time.
+- **Merged trees** show their lineage instead.
+- **Pictures:** each of the 24 tier and style combinations has its own picture (`packages/landing/public/bcmr/trees/`). Indexers (bcmr.paytaca.com, which Cashonize and Paytaca use) don't run parse bytecode yet, so the registry also lists every known tree by its exact commitment. That entry is what gives each tree its own icon.
+- **Trees planted later** get their own icon after the next `publish`. Until then they still parse correctly.
+- **The app** uses the same names, via `treeName` in the protocol package.
+
+**Updating the metadata** (new trees, new pictures or copy):
+
+```bash
+cd packages/contracts
+FOCUS_GARDEN_CONFIRM_MAINNET=yes bun run deploy publish --network mainnet
+# writes the new registry into packages/landing/public/.well-known/, then stops:
+cd ../landing && bun run build && cf deploy ./dist
+cd ../contracts && FOCUS_GARDEN_CONFIRM_MAINNET=yes bun run deploy publish --network mainnet
+```
+
+The second run checks the hosted bytes against the hash in the signed transactions before it broadcasts. It then extends both authchains from the authority key, and the deployer pays the fees. **Deploy the landing page only from a branch that contains `public/.well-known/`, `public/bcmr/` and `public/_headers`.** A build without them takes the registry offline.
+
+**Creator trees.** The Focus Forest genesis transaction (`2d84dd8d230073be1d903d3796a008b1f392a740af1963de403ff5c53abca68f`) minted 100 trees straight to the owner's Cashonize wallet `bitcoincash:zq57pxa24rtynycq57qpsav697jtn9rugvrzurjl7d`, with no planting and no time lock:
+- **Mix:** 16 Sprouts, 24 Trees, 30 Big trees and 30 Houses, across all six styles.
+- **Format:** the normal tree format, immutable, so they look and behave like claimed trees and can be sent to anyone.
+- **Leaderboard:** counts only trees planted through the contract, so they add no points.
+
+The command was `bun run deploy deploy --network mainnet --creator-nfts 100 --creator-address <address>`.
+
+All transactions, including metadata revisions, are in `packages/contracts/deployments/mainnet.json`. v2 (`deployments/mainnet-v2.json`, category `cd98a853…04e1`) and v1 (`deployments/mainnet-v1.json`) are superseded. No tree was ever planted in v2. Its 100 creator trees are still in the owner's Cashonize wallet with 1,000 sats each, but they carry no metadata.
