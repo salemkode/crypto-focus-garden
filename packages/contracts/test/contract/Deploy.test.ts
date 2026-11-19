@@ -2,7 +2,7 @@ import { binToHex, cashAddressToLockingBytecode, createVirtualMachineBCH2023, de
 import { MockNetworkProvider, randomUtxo, TransactionBuilder } from "cashscript";
 import forestArtifact from "../../artifacts/FocusForest.artifact.js";
 import directoryArtifact from "../../artifacts/FocusDirectory.artifact.js";
-import { BATON_SATOSHIS, contractAt, planDeployment, STEP_FEE_SATOSHIS } from "../../src/deploy/genesis.js";
+import { BATON_SATOSHIS, contractAt, CREATOR_NFT_SATOSHIS, creatorCommitments, planDeployment, STEP_FEE_SATOSHIS } from "../../src/deploy/genesis.js";
 import { decToHexWithEndianSwap } from "../../src/utils.js";
 import { aliceAddress, aliceSigTemplate, bobPkh } from "../shared.js";
 
@@ -73,3 +73,45 @@ describe("one-time shared deployment", () => {
 	});
 });
 
+
+describe("creator trees in the genesis transaction", () => {
+	const provider = new MockNetworkProvider();
+	const coins = [randomUtxo({ satoshis: 300000n })];
+	const commitments = creatorCommitments(aliceAddress, 100, 1800000000);
+	const plan = planDeployment(provider, aliceSigTemplate, aliceAddress, coins, { forest: forestArtifact, directory: directoryArtifact }, { address: aliceAddress, commitments });
+
+	test("100 creator trees: 16 sprouts, 24 trees, 30 big trees, 30 houses across all six styles, all unique", () => {
+		expect(commitments).toHaveLength(100);
+		expect(new Set(commitments).size).toBe(100);
+		const tiers = [1, 2, 3, 4].map((tier) => commitments.filter((c) => parseInt(c.slice(-2), 16) >> 4 === tier).length);
+		expect(tiers).toEqual([16, 24, 30, 30]);
+		expect(new Set(commitments.map((c) => parseInt(c.slice(-2), 16) & 15))).toEqual(new Set([1, 2, 3, 4, 5, 6]));
+		// Same 39-byte layout as a planted tree, with each tier's real lock units, so the app shows them normally.
+		for (const c of commitments) expect(c).toMatch(/^05[0-9a-f]{40}[0-9a-f]{24}[0-9a-f]{8}(01|03|06|0b)[1-4][1-6]$/);
+	});
+
+	test("the whole chain is valid, the creator gets 100 immutable trees, and the baton still lands in the contract", () => {
+		const known = new Map<string, Output>();
+		coins.forEach((coin) => known.set(`${coin.txid}:${coin.vout}`, { lockingBytecode: lockingBytecode(aliceAddress), valueSatoshis: coin.satoshis }));
+		const vm = createVirtualMachineBCH2023();
+		for (const step of plan.steps) {
+			const transaction = decodeTransaction(hexToBin(step.raw));
+			if (typeof transaction === "string") throw new Error(transaction);
+			const sourceOutputs = transaction.inputs.map((input) => known.get(`${binToHex(input.outpointTransactionHash)}:${input.outpointIndex}`)!);
+			expect(vm.verify({ transaction, sourceOutputs })).toBe(true);
+			transaction.outputs.forEach((output, vout) => known.set(`${step.txid}:${vout}`, output));
+		}
+		const genesis = decodeTransaction(hexToBin(plan.steps[1].raw));
+		if (typeof genesis === "string") throw new Error(genesis);
+		const creator = genesis.outputs.filter((o) => o.token?.nft?.capability === "none");
+		expect(creator).toHaveLength(100);
+		expect(creator.every((o) => binToHex(o.lockingBytecode) === binToHex(lockingBytecode(aliceAddress)) && o.valueSatoshis === CREATOR_NFT_SATOSHIS && binToHex(o.token!.category) === plan.forest.category)).toBe(true);
+		expect(genesis.outputs.filter((o) => o.token?.nft?.capability === "minting")).toHaveLength(1);
+		expect(binToHex(genesis.outputs[0].lockingBytecode)).toBe(plan.forest.lockingBytecode);
+		// Standard size, fee about 1.1 sat per byte.
+		const bytes = plan.steps[1].raw.length / 2;
+		expect(bytes).toBeLessThan(100000);
+		const fee = 300000n - STEP_FEE_SATOSHIS - BATON_SATOSHIS - 100n * CREATOR_NFT_SATOSHIS - genesis.outputs.at(-1)!.valueSatoshis;
+		expect(Number(fee)).toBeGreaterThanOrEqual(bytes);
+	});
+});

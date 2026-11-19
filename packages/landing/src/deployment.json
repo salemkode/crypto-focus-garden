@@ -2,13 +2,13 @@
 	"network": "mainnet",
 	"deployed": true,
 	"forest": {
-		"category": "0949e4d7094966ac9e0bedceb8cde8a92d2d53e79fd9efe6686376e640ea3401",
-		"address": "bitcoincash:pvh9q4ts2wngk5ts44eyjvu6r6uzswlf5qlmg78tzhacva9luc47se32m43xj",
-		"genesis": "02986525728ea796f5031c1d9e4f6346b832919e4434cf59e8de45d168a5e3aa"
+		"category": "cd98a853ba5fa2758b773667d7a24dc75aad9b0e44d5fff860155377b67e04e1",
+		"address": "bitcoincash:pwqv2hk4m9hs2n5lvsylsdymadt5cy8wvcjmxst3fyxmvpud705hg5pp2mugf",
+		"genesis": "e60e66507468691fc10fc79a3aaeef12564317fa146f4618408783a1165a496e"
 	},
 	"directory": {
-		"category": "9edee153596de9b8c370e728b9ded8696a9fa094e6f1a0ca8de2dd5d74b3ee8f",
-		"address": "bitcoincash:pwa4g6w9xflqxk98yynjhwkxyu5dagzzc2e89v2qzc4p09yvuf6aje3m0fs2u",
-		"genesis": "8e5b1860a54475a2e8022d0cc46b4420bf633d64b30523e9d7e0d488eebb7cdb"
+		"category": "4bd83509d94f2013aaa576729be83b0287ac0df62c9ca56ae1c6b45629c65a06",
+		"address": "bitcoincash:pvheta4rag6qfza50rz8vvemy5jhfle8uy5prnjz52g6zqc9aqs37jsngq48k",
+		"genesis": "7e6b0bbd4fbc217b9556a4edfed5243e3dba834533b0877e1ca34c5c2e1c6d49"
 	}
 }

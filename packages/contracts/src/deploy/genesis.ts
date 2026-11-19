@@ -1,4 +1,4 @@
-import { binToHex, cashAddressToLockingBytecode, hash256, hexToBin } from "@bitauth/libauth";
+import { binToHex, cashAddressToLockingBytecode, hash160, hash256, hexToBin, lockingBytecodeToCashAddress } from "@bitauth/libauth";
 import { Contract, TransactionBuilder, type Artifact, type NetworkProvider, type SignatureTemplate, type Utxo } from "cashscript";
 
 /**
@@ -14,6 +14,14 @@ import { Contract, TransactionBuilder, type Artifact, type NetworkProvider, type
 export const BATON_SATOSHIS = 1000n;
 export const STEP_FEE_SATOSHIS = 1000n;
 export const DUST_SATOSHIS = 546n;
+/** Value carried by each creator NFT output (above the CashTokens dust limit). */
+export const CREATOR_NFT_SATOSHIS = 1000n;
+
+/** NFTs minted to the creator in the genesis transaction itself: no plant, no time lock. */
+export interface CreatorMint {
+	address: string;
+	commitments: string[];
+}
 
 export const transactionIdOf = (raw: string) => binToHex(hash256(hexToBin(raw)).reverse());
 
@@ -42,24 +50,76 @@ export function buildPrep(provider: NetworkProvider, signer: SignatureTemplate, 
 	return { step: { name, raw, txid } satisfies Step, output: { txid, vout: 0, satoshis: total - STEP_FEE_SATOSHIS } satisfies Utxo };
 }
 
-/** Spends an output 0 to create a category and locks its minting baton in the contract. */
-export function buildGenesis(provider: NetworkProvider, signer: SignatureTemplate, address: string, coin: Utxo, artifact: Artifact, name: string) {
+/**
+ * Spends an output 0 to create a category and locks its minting baton in the contract.
+ * Optionally mints creator NFTs (immutable, so they behave like claimed trees) in the same
+ * transaction. The fee grows with the transaction size (about 1.1 sat per byte).
+ */
+export function buildGenesis(provider: NetworkProvider, signer: SignatureTemplate, address: string, coin: Utxo, artifact: Artifact, name: string, creator?: CreatorMint) {
 	if (coin.vout !== 0 || coin.token) throw new Error("Genesis must spend a plain output with index 0.");
-	const change = coin.satoshis - BATON_SATOSHIS - STEP_FEE_SATOSHIS;
-	if (change < DUST_SATOSHIS) throw new Error("Not enough BCH for the minting baton and fee.");
 	const category = coin.txid;
 	const contract = contractAt(artifact, category, provider);
-	const raw = new TransactionBuilder({ provider })
-		.addInput(coin, signer.unlockP2PKH())
-		.addOutput({ to: contract.tokenAddress, amount: BATON_SATOSHIS, token: { category, amount: 0n, nft: { capability: "minting", commitment: "" } } })
-		.addOutput({ to: address, amount: change })
-		.build();
+	const minted = creator?.commitments ?? [];
+	for (const commitment of minted) if (!/^[0-9a-f]{2,80}$/.test(commitment) || commitment.length % 2) throw new Error(`Invalid NFT commitment: ${commitment}`);
+	const build = (fee: bigint) => {
+		const change = coin.satoshis - BATON_SATOSHIS - BigInt(minted.length) * CREATOR_NFT_SATOSHIS - fee;
+		if (change < DUST_SATOSHIS) throw new Error("Not enough BCH for the minting baton, creator NFTs and fee.");
+		const builder = new TransactionBuilder({ provider })
+			.addInput(coin, signer.unlockP2PKH())
+			.addOutput({ to: contract.tokenAddress, amount: BATON_SATOSHIS, token: { category, amount: 0n, nft: { capability: "minting", commitment: "" } } });
+		for (const commitment of minted) builder.addOutput({ to: tokenAddress(creator!.address), amount: CREATOR_NFT_SATOSHIS, token: { category, amount: 0n, nft: { capability: "none", commitment } } });
+		builder.addOutput({ to: address, amount: change });
+		return { raw: builder.build(), change };
+	};
+	const draft = build(STEP_FEE_SATOSHIS);
+	const fee = [STEP_FEE_SATOSHIS, BigInt(Math.ceil((draft.raw.length / 2) * 1.1))].reduce((a, b) => (a > b ? a : b));
+	const { raw, change } = fee === STEP_FEE_SATOSHIS ? draft : build(fee);
 	const txid = transactionIdOf(raw);
 	return {
 		step: { name, raw, txid } satisfies Step,
-		change: { txid, vout: 1, satoshis: change } satisfies Utxo,
-		deployment: { category, address: contract.address, tokenAddress: contract.tokenAddress, lockingBytecode: lockingBytecodeOf(contract.address), batonOutpoint: `${txid}:0` },
+		change: { txid, vout: 1 + minted.length, satoshis: change } satisfies Utxo,
+		deployment: { category, address: contract.address, tokenAddress: contract.tokenAddress, lockingBytecode: lockingBytecodeOf(contract.address), batonOutpoint: `${txid}:0`, creatorNfts: minted.length },
 	};
+}
+
+function tokenAddress(address: string) {
+	const decoded = cashAddressToLockingBytecode(address);
+	if (typeof decoded === "string") throw new Error(decoded);
+	const result = lockingBytecodeToCashAddress({ bytecode: decoded.bytecode, prefix: decoded.prefix, tokenSupport: true });
+	if (typeof result === "string") throw new Error(result);
+	return result.address;
+}
+
+/** Minimum lock units per tier, as enforced by FocusForest.cash plantTree. */
+const TIER_UNITS = [1, 3, 6, 11] as const;
+
+/**
+ * Commitments for creator trees, in the exact Focus Forest v5 format
+ * (05 | owner pkh | planter tag | stamp LE | units | look), so the app shows them like any
+ * claimed tree. The mix leans toward bigger trees: 16% Sprout, 24% Tree, 30% Big tree,
+ * 30% House, cycling through the six styles. Stamps count up from `stamp` so each is unique.
+ */
+export function creatorCommitments(ownerAddress: string, count: number, stamp: number) {
+	const decoded = cashAddressToLockingBytecode(ownerAddress);
+	if (typeof decoded === "string") throw new Error(decoded);
+	const bytecode = binToHex(decoded.bytecode);
+	if (!/^76a914[0-9a-f]{40}88ac$/.test(bytecode)) throw new Error("Creator NFTs go to a P2PKH wallet address.");
+	const pkh = bytecode.slice(6, 46);
+	const tag = binToHex(hash160(decoded.bytecode).slice(0, 12));
+	const shares = [0.16, 0.24, 0.3, 0.3];
+	const counts = shares.map((share) => Math.floor(share * count));
+	counts[3] += count - counts.reduce((a, b) => a + b, 0);
+	const le32 = (value: number) => binToHex(Uint8Array.from([value & 255, (value >>> 8) & 255, (value >>> 16) & 255, (value >>> 24) & 255]));
+	const byte = (value: number) => value.toString(16).padStart(2, "0");
+	const out: string[] = [];
+	counts.forEach((n, index) => {
+		const tier = index + 1;
+		for (let i = 0; i < n; i++) {
+			const species = (out.length % 6) + 1;
+			out.push(`05${pkh}${tag}${le32(stamp + out.length)}${byte(TIER_UNITS[index])}${byte(tier * 16 + species)}`);
+		}
+	});
+	return out;
 }
 
 function lockingBytecodeOf(address: string) {
@@ -71,9 +131,9 @@ function lockingBytecodeOf(address: string) {
 }
 
 /** Builds the full chain of four transactions for Focus Forest and Focus Directory. */
-export function planDeployment(provider: NetworkProvider, signer: SignatureTemplate, address: string, coins: Utxo[], artifacts: { forest: Artifact; directory: Artifact }) {
+export function planDeployment(provider: NetworkProvider, signer: SignatureTemplate, address: string, coins: Utxo[], artifacts: { forest: Artifact; directory: Artifact }, creator?: CreatorMint) {
 	const forestPrep = buildPrep(provider, signer, address, coins, "forest-prep");
-	const forest = buildGenesis(provider, signer, address, forestPrep.output, artifacts.forest, "forest-genesis");
+	const forest = buildGenesis(provider, signer, address, forestPrep.output, artifacts.forest, "forest-genesis", creator);
 	const directoryPrep = buildPrep(provider, signer, address, [forest.change], "directory-prep");
 	const directory = buildGenesis(provider, signer, address, directoryPrep.output, artifacts.directory, "directory-genesis");
 	return {
