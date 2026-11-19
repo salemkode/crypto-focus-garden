@@ -1,0 +1,5 @@
+# Netlify builds the web prototype (packages/dapp) from this monorepo; build settings stay in the
+# Netlify UI. Bun 1.3.x runs out of memory resolving this workspace (over 10 GB, so Netlify kills
+# the install); 1.4 installs it in under 100 MB.
+[build.environment]
+  BUN_VERSION = "1.4.4"

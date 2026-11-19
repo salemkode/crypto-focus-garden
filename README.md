@@ -29,7 +29,7 @@ Inside the app:
 
 ## Getting started
 
-Requires [Bun](https://bun.sh), Xcode for iOS, and Android Studio for Android.
+Requires [Bun](https://bun.sh) 1.4 or newer (1.3 runs out of memory installing this workspace), Xcode for iOS, and Android Studio for Android.
 
 ```sh
 bun install --frozen-lockfile

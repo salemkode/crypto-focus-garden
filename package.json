@@ -6,6 +6,7 @@
 		"packages/*"
 	],
 	"license": "MIT",
+	"packageManager": "bun@1.4.4",
 	"scripts": {
 		"compile": "bun run --filter='*' compile",
 		"dev": "bun run dev:web",
