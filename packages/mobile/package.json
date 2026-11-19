@@ -97,6 +97,7 @@
     "lint": "eslint src --max-warnings 0",
     "test": "bun test test tests",
     "test:native-core": "cd modules/libauth-native && bun run test:host",
+    "export:web": "expo export --platform web --output-dir dist-web && node scripts/web-phone-frame.mjs dist-web",
     "export:check": "expo export --platform ios --platform android --output-dir dist",
     "build:valley": "bun scripts/build-valley-embed.mjs",
     "check:valley": "bun scripts/build-valley-embed.mjs --check"
