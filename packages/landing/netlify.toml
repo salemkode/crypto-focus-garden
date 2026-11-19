@@ -1,0 +1,27 @@
+# Netlify site for the landing page: set the site's base directory to packages/landing.
+# (The repository root netlify.toml belongs to the web prototype in packages/dapp.)
+[build]
+  # The landing page needs no native modules; skipping install scripts avoids compiling
+  # better-sqlite3 (a dependency of other packages) on Netlify's Linux image.
+  command = "cd ../.. && bun install --ignore-scripts && bun run landing:build"
+  publish = "dist"
+
+[build.environment]
+  BUN_VERSION = "1.4.4"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
