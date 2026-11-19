@@ -9,6 +9,7 @@ import { checkSaved, resendSaved, savedOperation, submit } from '../../services/
 import Storage from 'expo-sqlite/kv-store';
 import { AppState } from 'react-native';
 import { cachedGardenSchema, gardenCacheKey, loadGarden } from '../../services/garden';
+import { assertNameAvailable, rewardOwners } from '../../services/community';
 import { DEPLOYMENT } from '../../services/network';
 import { consentsSchema, newConsent, nextRelease, RELEASE_FEE_CEILING_SATS, spendConsent, type ReleaseConsent } from './auto-release';
 
@@ -135,7 +136,7 @@ function useRewardStore() {
     async function load(current: NonNullable<typeof account>) { try {
       // Read-only: settle a saved transaction from what the chain shows; nothing is sent from here.
       if (savedOperation()) { await checkSaved(); setPending(savedOperation()); }
-      const next = await loadGarden(current.address, recipientRef.current || null);
+      const next = await loadGarden(current.address, recipientRef.current || null, await rewardOwners(current.address));
       const time = Date.now();
       const key = gardenCacheKey({ address: current.address, category: DEPLOYMENT.forest.category });
       if (key) Storage.setItemSync(key, JSON.stringify({ checkedAt: time, garden: next }));
@@ -178,6 +179,7 @@ function useRewardStore() {
     let sent = false;
     try {
       if (!account) throw new GardenWalletError({ message: 'Open your app wallet first.' });
+      if (input.action === 'register') await assertNameAvailable(account.address, input.name);
       beforeStart?.();
       const result = input.action === 'rebroadcast' ? await resendSaved()
         : input.action === 'recover' ? await checkSaved()

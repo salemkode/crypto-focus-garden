@@ -18,13 +18,17 @@ export function mergeableTrees(sessions: z.infer<typeof gardenSchema>['sessions'
   return sessions.filter((entry) => entry.state === 'claimable');
 }
 
-/** The garden of this app wallet, read from Bitcoin Cash. `linked` is the wallet that receives trees. */
-export async function loadGarden(appAddress: string, linked: string | null) {
+/**
+ * The garden of this app wallet, read from Bitcoin Cash. `linked` is the wallet that receives trees;
+ * `previousOwners` are locking bytecodes of wallets it planted for before (see `rewardOwners`), so
+ * trees sent to a previously linked wallet stay in the garden.
+ */
+export async function loadGarden(appAddress: string, linked: string | null, previousOwners: readonly string[] = []) {
   const garden = await readGarden({
     chain,
     deployment: DEPLOYMENT,
     appLockingBytecode: parseRewardAddress(appAddress).lockingBytecode,
-    ownerLockingBytecodes: linked ? [parseRewardAddress(linked).lockingBytecode] : [],
+    ownerLockingBytecodes: [...previousOwners, ...(linked ? [parseRewardAddress(linked).lockingBytecode] : [])],
     nowMs: Date.now(),
   });
   return { state: 'connected' as const, ...garden };

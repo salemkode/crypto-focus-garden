@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { useSyncExternalStore } from 'react';
+import { GardenTransactionError } from '@focus-garden/protocol';
 import { planterTag } from '@focus-garden/protocol/forest';
 import { rankLeaders, scanForest, type ChainTransaction, type ForestScan, type LeaderEntry } from '@focus-garden/protocol/leaderboard';
 import { parseRewardAddress } from '../wallet/address';
@@ -40,6 +41,29 @@ async function scan(force = false) {
 /** Verified focus leaderboard (opt-in profiles only), straight from the chain. */
 export async function fetchLeaderboard(period: 'week' | 'all') {
   return { period, entries: rankLeaders(await scan(true), period, Math.floor(Date.now() / 1000), DEPLOYMENT.prefix) };
+}
+
+/**
+ * Every wallet this app wallet has planted trees for, from the Focus Forest's history. Trees released
+ * to a wallet linked earlier stay in the garden after the user links another one.
+ */
+export async function rewardOwners(wallet: string) {
+  const id = planterTag(parseRewardAddress(wallet).lockingBytecode);
+  return [...new Set((await scan()).plantings.filter((entry) => entry.planterTag === id).map((entry) => entry.ownerBytecode))];
+}
+
+/**
+ * The leaderboard shows a name only for its first holder, so joining under a name someone else holds
+ * would cost the fee and deposit and still leave the user off the board. Checked before signing.
+ */
+export async function assertNameAvailable(wallet: string, name: string) {
+  const holder = parseRewardAddress(wallet).lockingBytecode;
+  const key = name.trim().toLowerCase();
+  for (const profile of (await scan(true)).profiles.values()) {
+    if (profile.name.trim().toLowerCase() === key && profile.holder !== holder) {
+      throw new GardenTransactionError({ message: `Someone already uses the name ${name.trim()}. Choose another name. Nothing was sent.` });
+    }
+  }
 }
 
 const profileSchema = z.discriminatedUnion('state', [
