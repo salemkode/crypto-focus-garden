@@ -75,14 +75,15 @@ export async function prepareReward(provider: NetworkProvider, ledger: Ledger, o
       if (plantedAt > Math.floor(Date.now() / 1000) + 120) throw new GardenTransactionError({ message: 'Too many identical plantings right now. Try again in a minute.' });
       commitment = plantedCommitment(binToHex(reward), binToHex(internal), plantedAt, intent.units, intent.tier, intent.species);
     }
-    ledger.reserveCoins(operation, [outpoint(baton), outpoint(funding)]);
     builder.setLocktime(plantedAt)
       .addInput(baton, contract.unlock.plantTree(BigInt(plantedAt), BigInt(intent.units), BigInt(intent.tier), BigInt(intent.species), reward.slice(3, 23)), { sequence: 0xffffffff })
       .addInput(funding, placeholderP2PKHUnlocker(wallet), { sequence: 0xffffffff })
       .addOutput({ to: contract.tokenAddress, amount: baton.satoshis, token: baton.token })
       .addOutput({ to: contract.tokenAddress, amount: 1000n, token: { category, amount: 0n, nft: { capability: 'mutable', commitment } } })
       .addOutput({ to: wallet, amount: funding.satoshis - 3000n });
-    ledger.db.run('INSERT INTO sessions(commitment,account,wallet,reward,duration,plantedAt,plant,claim) VALUES(?,?,?,?,?,?,?,NULL)', [commitment, account, wallet, intent.rewardAddress, intent.units * UNIT_SECONDS, plantedAt * 1000, operation]);
+    ledger.reserveCoins(operation, [outpoint(baton), outpoint(funding)], () => {
+      ledger.db.run('INSERT INTO sessions(commitment,account,wallet,reward,duration,plantedAt,plant,claim) VALUES(?,?,?,?,?,?,?,NULL)', [commitment, account, wallet, intent.rewardAddress, intent.units * UNIT_SECONDS, plantedAt * 1000, operation]);
+    });
     return finish([baton, funding]);
   }
   if (intent.action === 'claim') {
@@ -104,7 +105,6 @@ export async function prepareReward(provider: NetworkProvider, ledger: Ledger, o
   const trees = intent.commitments.map(lockedTree);
   if (trees.some((coin) => !coin)) throw new GardenTransactionError({ message: 'Every tree in this merge must be available in the contract.' });
   const inputs = trees as NonNullable<(typeof trees)[number]>[];
-  ledger.reserveCoins(operation, [...inputs.map(outpoint), outpoint(funding)]);
   builder.setLocktime(0);
   inputs.forEach((coin, index) => builder.addInput(coin, contract.unlock.mergeTrees(), { sequence: 4194304 + parseTree(intent.commitments[index])!.units }));
   const deposits = inputs.reduce((sum, coin) => sum + coin.satoshis, 0n);
@@ -113,10 +113,10 @@ export async function prepareReward(provider: NetworkProvider, ledger: Ledger, o
     .addOutput({ to: contract.tokenAddress, amount: deposits, token: { category, amount: 0n, nft: { capability: 'mutable', commitment: checked.result } } })
     .addOutput({ to: wallet, amount: funding.satoshis - 2000n });
   const reward = lockingBytecodeToAddress(parseTree(checked.result)!.ownerBytecode, network);
-  ledger.db.transaction(() => {
+  ledger.reserveCoins(operation, [...inputs.map(outpoint), outpoint(funding)], () => {
     ledger.db.run('INSERT INTO sessions(commitment,account,wallet,reward,duration,plantedAt,plant,claim) VALUES(?,?,?,?,0,?,?,NULL)', [checked.result, account, wallet, reward, Date.now(), operation]);
     intent.commitments.forEach((commitment) => ledger.db.run('UPDATE sessions SET mergedInto=? WHERE commitment=? AND account=?', [operation, commitment, account]));
-  }).immediate();
+  });
   return finish([...inputs, funding]);
 
   async function finish(spent: { txid: string }[]) {

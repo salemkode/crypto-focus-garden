@@ -116,6 +116,24 @@ export class Ledger {
     if (!row) throw new GardenTransactionError({ message: 'Unknown operation.' });
     return row;
   }
+  cancelPreparation(account: string, id: string) {
+    return this.db.transaction(() => {
+      if (this.setting('network') !== 'mainnet') throw new GardenTransactionError({ message: 'Preparation cancellation requires a Mainnet ledger.' });
+      const operation = this.operation(account, id);
+      if (operation.state === 'cancelled') return operation;
+      if (operation.state !== 'prepared' || !operation.payload || operation.raw !== null || operation.txid !== null) {
+        throw new GardenTransactionError({ message: 'Only an unsubmitted preparation can be cancelled.' });
+      }
+      this.db.run("UPDATE operations SET state='cancelled' WHERE id=?", [id]);
+      this.db.run('DELETE FROM coins WHERE operation=?', [id]);
+      this.db.run('DELETE FROM sessions WHERE plant=?', [id]);
+      this.db.run('UPDATE sessions SET claim=NULL WHERE claim=?', [id]);
+      this.db.run('UPDATE sessions SET mergedInto=NULL WHERE mergedInto=?', [id]);
+      this.db.run('DELETE FROM profiles WHERE operation=?', [id]);
+      this.audit(account, 'preparation_cancelled', id);
+      return this.operation(account, id);
+    }).immediate();
+  }
   reserve(input: { account: string; key: string; wallet: string; kind: 'credit' | 'plant' | 'claim' | 'merge' | 'register' | 'tip'; intent: string; amount: number; budget: number; dailyBudget?: number }) {
     return this.db.transaction(() => {
       const previous = this.get(input.account, input.key);
@@ -138,10 +156,11 @@ export class Ledger {
       return this.operation(input.account, id);
     }).immediate();
   }
-  reserveCoins(id: string, outpoints: string[]) {
+  reserveCoins(id: string, outpoints: string[], recordRelationships?: () => void) {
     this.db.transaction(() => {
       if (!this.db.query("SELECT 1 FROM operations WHERE id=? AND state='reserved'").get(id)) throw new GardenTransactionError({ message: 'Operation is no longer reserved.' });
       outpoints.forEach((outpoint) => this.db.run('INSERT INTO coins VALUES(?,?)', [outpoint, id]));
+      recordRelationships?.();
     }).immediate();
   }
   available(outpoint: string) { return !this.db.query('SELECT 1 FROM coins WHERE outpoint=?').get(outpoint); }

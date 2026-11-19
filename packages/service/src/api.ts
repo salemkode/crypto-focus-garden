@@ -19,6 +19,7 @@ function requestFor(network: GardenNetwork) {
     z.object({ method: z.literal('profile'), wallet: address }),
     z.object({ method: z.literal('prepare'), wallet: address, key: z.string().uuid(), intent: gardenIntent(network) }),
     z.object({ method: z.literal('submit'), id: z.string().uuid(), raw: hex }),
+    z.object({ method: z.literal('cancelPreparation'), id: z.string().uuid() }),
     z.object({ method: z.literal('reconcile'), id: z.string().uuid() }),
     z.object({ method: z.literal('recover'), key: z.string().uuid().optional(), wallet: address.optional() }),
     z.object({ method: z.literal('garden'), wallet: address }),
@@ -70,6 +71,7 @@ export function createGardenService(config: {
     const txid = transactionId(raw);
     const started = ledger.db.transaction(() => {
       const latest = ledger.operation(account, id);
+      if (latest.state === 'cancelled') throw new GardenTransactionError({ message: 'This preparation was cancelled.' });
       if (latest.raw) {
         if (latest.raw !== raw) throw new GardenTransactionError({ message: 'An operation cannot be replaced.' });
         return false;
@@ -144,6 +146,7 @@ export function createGardenService(config: {
       return { operations: request.key ? [ledger.get(account, request.key)].filter((entry) => entry !== null) : z.array(operationSchema).parse(request.wallet ? ledger.db.query("SELECT * FROM operations WHERE account=? AND wallet=? AND state NOT IN ('seen','cancelled') ORDER BY rowid DESC LIMIT 100").all(account, request.wallet) : ledger.db.query("SELECT * FROM operations WHERE account=? ORDER BY rowid DESC LIMIT 100").all(account)) };
     }
     if (request.method === 'reconcile') return reconcile(account, request.id);
+    if (request.method === 'cancelPreparation') return ledger.cancelPreparation(account, request.id);
     if (request.method === 'challenge') {
       lockingBytecode(request.wallet, network);
       const nonce = crypto.randomUUID();
@@ -190,9 +193,9 @@ export function createGardenService(config: {
     }
     if (request.method === 'submit') {
       if (!config.writesEnabled) throw new GardenTransactionError({ message: writeRequired });
-    ledger.requireWrites();
+      ledger.requireWrites();
       const operation = ledger.operation(account, request.id);
-      if (operation.kind === 'credit' || !operation.payload) throw new GardenTransactionError({ message: 'No prepared reward transaction.' });
+      if (operation.state === 'cancelled' || operation.kind === 'credit' || !operation.payload) throw new GardenTransactionError({ message: 'No active prepared reward transaction.' });
       const prepared = preparedSchema.parse(JSON.parse(operation.payload));
       const resolved = resolvePrepared(prepared, network);
       const signed = decode(request.raw);
@@ -258,11 +261,14 @@ export function createGardenService(config: {
     }
     const operation = ledger.reserve({ account, key: request.key, wallet: request.wallet, kind: request.intent.action, intent, amount: 0, budget: config.budget, dailyBudget: config.dailyBudget });
     const reward = await prepareReward(provider, ledger, operation.id, account, request.wallet, config.category, request.intent, { directoryCategory: config.directoryCategory });
-    if (request.intent.action === 'register') ledger.db.run('INSERT INTO profiles VALUES(?,?,?,?,?,?)', [request.wallet, account, request.intent.name.trim(), request.intent.about.trim(), operation.id, Date.now()]);
     const prepared = preparedSchema.parse({ ...reward, chainIdentity: config.chainIdentity });
-    ledger.db.run("UPDATE operations SET state='prepared',payload=? WHERE id=?", [JSON.stringify(prepared), operation.id]);
-    if (session) ledger.db.run('UPDATE sessions SET claim=? WHERE commitment=?', [operation.id, session.commitment]);
-    return ledger.operation(account, operation.id);
+    return ledger.db.transaction(() => {
+      const changed = ledger.db.run("UPDATE operations SET state='prepared',payload=? WHERE id=? AND state='reserved'", [JSON.stringify(prepared), operation.id]);
+      if (changed.changes !== 1) throw new GardenTransactionError({ message: 'Operation is no longer reserved.' });
+      if (request.intent.action === 'register') ledger.db.run('INSERT INTO profiles VALUES(?,?,?,?,?,?)', [request.wallet, account, request.intent.name.trim(), request.intent.about.trim(), operation.id, Date.now()]);
+      if (session) ledger.db.run('UPDATE sessions SET claim=? WHERE commitment=?', [operation.id, session.commitment]);
+      return ledger.operation(account, operation.id);
+    }).immediate();
   }
   // Serialize this instance across awaits; SQLite uniqueness/reservations also
   // protect account caps and coins across processes sharing this ledger.
@@ -279,7 +285,7 @@ export function createGardenService(config: {
       const text = await request.text();
       if (text.length > 250000) return Response.json({ error: 'Request too large' }, { status: 413 });
       const parsed = requestSchema.parse(JSON.parse(text));
-      if (['credit', 'prepare', 'submit', 'rebroadcast'].includes(parsed.method)) ledger.throttle(`writes:${account}`, 20);
+      if (['credit', 'prepare', 'submit', 'rebroadcast', 'cancelPreparation'].includes(parsed.method)) ledger.throttle(`writes:${account}`, 20);
       if (parsed.method === 'challenge') ledger.throttle(`challenges:${account}`, 10);
       context.account = account;
       context.key = parsed.method === 'credit' || parsed.method === 'prepare' ? parsed.key : '';

@@ -72,7 +72,9 @@ bun run --cwd packages/service admin pause DATABASE broadcasts.paused
 bun run --cwd packages/service recover:reservation DATABASE OPERATION_UUID
 ```
 
-Pause controls/audit records persist. `resume` is explicit. The guarded reservation utility refuses returned prepared payloads or recorded signed/broadcast bytes. If a crash occurred between saving signed bytes and calling the node, a read-only lookup may remain missing; preserve those bytes and investigate, then use an explicitly approved same-bytes resubmission. Never erase financial history, reset a wallet, or silently retry to recover from ambiguity.
+On Mainnet, the account can call `cancelPreparation` while the service has yet to record signed bytes. The operator equivalent is `recover:reservation DATABASE OPERATION_UUID --cancel-prepared`. Cancellation releases local input reservations and blocks further submission through this service for that operation. A signed copy already held outside the service can still compete for the inputs on-chain.
+
+Pause controls and audit records persist. `resume` is explicit. The default recovery command only releases a reservation that has never produced a prepared payload. Both recovery modes preserve recorded signed bytes. If a crash occurred between saving signed bytes and calling the node, a read-only lookup may remain missing. Preserve those bytes and investigate before explicitly resubmitting the same bytes.
 
 ## Current evidence and outstanding gates
 

@@ -112,8 +112,8 @@ test('Mainnet plants and claims a self-funded tree while rejecting Chipnet data 
   expect(() => createGardenService({ ...config, provider: new TestNetwork('chipnet') })).toThrow();
   const mainWallet = walletAddress(signer.getPublicKey(), 'bitcoincash');
   const mainReward = walletAddress(external.getPublicKey(), 'bitcoincash');
-  async function rpc(body: object, handler = service) {
-    const response = await handler(new Request('https://garden.test/v1/rpc', { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: JSON.stringify(body) }));
+  async function rpc(body: object, handler = service, access = token) {
+    const response = await handler(new Request('https://garden.test/v1/rpc', { method: 'POST', headers: { authorization: `Bearer ${access}` }, body: JSON.stringify(body) }));
     return { status: response.status, data: await response.json() };
   }
   expect((await rpc({ method: 'whoami' })).data.network).toBe('mainnet');
@@ -140,7 +140,17 @@ test('Mainnet plants and claims a self-funded tree while rejecting Chipnet data 
   expect(ledger.get('main-account', plant.key)).toBeNull();
   ledger.setControl('broadcasts.paused', false);
   expect((await rpc({ ...plant, intent: { ...plant.intent, rewardAddress } })).status).not.toBe(200);
-  const prepared = JSON.parse((await rpc(plant)).data.payload);
+  const abandoned = JSON.parse((await rpc(plant)).data.payload);
+  const abandonedRaw = signPrepared(abandoned, 'mainnet');
+  const cancel = { method: 'cancelPreparation', id: abandoned.id };
+  expect((await rpc(cancel, service, ledger.createAccount('other-account'))).status).toBe(409);
+  expect((await rpc(cancel, readOnlyService)).data.state).toBe('cancelled');
+  expect((await rpc(cancel)).data.state).toBe('cancelled');
+  expect((await rpc(plant)).data.state).toBe('cancelled');
+  expect((await rpc({ method: 'submit', id: abandoned.id, raw: abandonedRaw })).status).toBe(409);
+  expect(provider.broadcasts).toBe(0);
+  const prepared = JSON.parse((await rpc({ ...plant, key: crypto.randomUUID() })).data.payload);
+  expect(prepared.id).not.toBe(abandoned.id);
   expect(prepared.network).toBe('mainnet');
   expect(() => resolvePrepared(prepared)).toThrow();
   const contractAddress = cashAddressToLockingBytecode(contract.address);
@@ -149,14 +159,25 @@ test('Mainnet plants and claims a self-funded tree while rejecting Chipnet data 
     internalBytecode: binToHex(script), rewardBytecode: binToHex(lockingBytecode(mainReward, 'mainnet')), nowSeconds: Math.floor(Date.now() / 1000) };
   const planted = validateRewardTransaction(prepared, plant.intent, proofPolicy);
   expect((await rpc({ method: 'submit', id: prepared.id, raw: signPrepared(prepared, 'mainnet') })).data.state).toBe('seen');
+  expect((await rpc({ method: 'cancelPreparation', id: prepared.id })).status).toBe(409);
   const claim = { ...plant, key: crypto.randomUUID(), intent: { action: 'claim' as const, commitment: planted.commitment } };
   expect((await rpc(claim)).status).toBe(409);
   timing.mature = true;
-  const release = JSON.parse((await rpc(claim)).data.payload);
+  const abandonedClaim = JSON.parse((await rpc(claim)).data.payload);
+  expect((await rpc({ method: 'cancelPreparation', id: abandonedClaim.id })).data.state).toBe('cancelled');
+  expect(ledger.db.query('SELECT claim FROM sessions WHERE commitment=?').get(planted.commitment)).toEqual({ claim: null });
+  const release = JSON.parse((await rpc({ ...claim, key: crypto.randomUUID() })).data.payload);
+  expect(release.id).not.toBe(abandonedClaim.id);
   validateRewardTransaction(release, claim.intent, proofPolicy);
-  expect((await rpc({ method: 'submit', id: release.id, raw: signPrepared(release, 'mainnet') })).data.state).toBe('seen');
+  const releaseRaw = signPrepared(release, 'mainnet');
+  provider.ambiguous = true;
+  expect((await rpc({ method: 'submit', id: release.id, raw: releaseRaw })).data.state).toBe('pending');
+  expect((await rpc({ method: 'cancelPreparation', id: release.id })).status).toBe(409);
+  expect(ledger.operation('main-account', release.id).raw).toBe(releaseRaw);
+  provider.ambiguous = false;
+  expect((await rpc({ method: 'rebroadcast', id: release.id })).data.state).toBe('seen');
   expect((await provider.getUtxos(mainReward)).some((entry) => entry.token?.nft?.capability === 'none' && entry.token.nft.commitment === planted.commitment)).toBe(true);
-  expect(provider.broadcasts).toBe(2);
+  expect(provider.broadcasts).toBe(3);
 });
 test('rejects unauthenticated credit, unproved wallets and replayed ownership proofs', async () => {
   const f = fixture();
