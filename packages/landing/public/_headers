@@ -1,0 +1,7 @@
+/.well-known/bitcoin-cash-metadata-registry.json
+  Access-Control-Allow-Origin: *
+  Content-Type: application/json; charset=utf-8
+  Cache-Control: public, max-age=300
+/bcmr/*
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=86400

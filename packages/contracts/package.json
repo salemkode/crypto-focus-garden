@@ -31,7 +31,8 @@
 	"dependencies": {
 		"@bch-wc2/cashscript-signer": "^0.0.15",
 		"@bch-wc2/mainnet-js-signer": "^0.0.15",
-		"zod": "^4.1.12"
+		"zod": "^4.1.12",
+		"@focus-garden/protocol": "workspace:*"
 	},
 	"peerDependencies": {
 		"cashscript": "next",

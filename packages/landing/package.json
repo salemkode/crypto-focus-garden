@@ -6,7 +6,7 @@
 	"scripts": {
 		"sync": "bun scripts/sync-deployment.ts",
 		"dev": "bun run sync && bun --port 4321 ./index.html",
-		"build": "bun run sync && rm -rf dist && bun build ./index.html --outdir dist --minify --splitting && cp public/icon.png dist/icon.png",
+		"build": "bun run sync && rm -rf dist && bun build ./index.html --outdir dist --minify --splitting && cp public/icon.png dist/icon.png && cp -R public/bcmr dist/bcmr && cp public/_headers dist/_headers && if [ -d public/.well-known ]; then cp -R public/.well-known dist/.well-known; fi",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
