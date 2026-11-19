@@ -44,6 +44,7 @@
 	},
 	"patchedDependencies": {
 		"react-native-worklets-core@1.6.3": "patches/react-native-worklets-core@1.6.3.patch",
-		"react-native-filament@1.11.0": "patches/react-native-filament@1.11.0.patch"
+		"react-native-filament@1.11.0": "patches/react-native-filament@1.11.0.patch",
+		"react-native-screens@4.30.1": "patches/react-native-screens@4.30.1.patch"
 	}
 }

@@ -1,0 +1,15 @@
+diff --git a/android/src/main/java/com/swmansion/rnscreens/bottomsheet/DimmingView.kt b/android/src/main/java/com/swmansion/rnscreens/bottomsheet/DimmingView.kt
+index 827b4d86c39f4b1d8cab60da347a4d6d4b8a7597..068176246bde960e33caa2c6a730ffe478c5e560 100644
+--- a/android/src/main/java/com/swmansion/rnscreens/bottomsheet/DimmingView.kt
++++ b/android/src/main/java/com/swmansion/rnscreens/bottomsheet/DimmingView.kt
+@@ -32,6 +32,10 @@ internal class DimmingView(
+     init {
+         pointerEventsProxy.pointerEventsImpl = DimmingViewPointerEventsImpl(this)
+         setFocusable(false)
++        // The tap-outside listener makes this view clickable, so TalkBack stopped on it as an unlabeled
++        // full-screen element. As in Material's own bottom sheets, the scrim is not an accessibility
++        // element; TalkBack users close the sheet with the back gesture.
++        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+     }
+ 
+     internal val blockGestures
