@@ -1,0 +1,52 @@
+{
+	"schema": "focus-garden-deployment-v1",
+	"network": "mainnet",
+	"deployer": "bitcoincash:qr4f0lj3amfyqmmv30jsqt9wr25rm0znagfg22drch",
+	"createdAt": "2026-11-19T06:06:58.735Z",
+	"artifacts": {
+		"forest": "4e24b4403b55766706a7ebf162714f82a40b626e2d12a36f63a32e171fdc6e52",
+		"directory": "f8af08e3892fe3d4c94683f8d3c795e9eb5e4f155e5cb6ca03dfb72e4bcf4f40"
+	},
+	"forest": {
+		"category": "0949e4d7094966ac9e0bedceb8cde8a92d2d53e79fd9efe6686376e640ea3401",
+		"address": "bitcoincash:pvh9q4ts2wngk5ts44eyjvu6r6uzswlf5qlmg78tzhacva9luc47se32m43xj",
+		"tokenAddress": "bitcoincash:rvh9q4ts2wngk5ts44eyjvu6r6uzswlf5qlmg78tzhacva9luc47stzk6vsle",
+		"lockingBytecode": "aa202e50557053a68b5170ad7249339a1eb8283be9a03fb478eb15fb8674bfe62be887",
+		"batonOutpoint": "02986525728ea796f5031c1d9e4f6346b832919e4434cf59e8de45d168a5e3aa:0"
+	},
+	"directory": {
+		"category": "9edee153596de9b8c370e728b9ded8696a9fa094e6f1a0ca8de2dd5d74b3ee8f",
+		"address": "bitcoincash:pwa4g6w9xflqxk98yynjhwkxyu5dagzzc2e89v2qzc4p09yvuf6aje3m0fs2u",
+		"tokenAddress": "bitcoincash:rwa4g6w9xflqxk98yynjhwkxyu5dagzzc2e89v2qzc4p09yvuf6ajtz8ws3nh",
+		"lockingBytecode": "aa20bb5469c5327e0358a721272bbac62728dea042c2b272b140162a17948ce275d987",
+		"batonOutpoint": "8e5b1860a54475a2e8022d0cc46b4420bf633d64b30523e9d7e0d488eebb7cdb:0"
+	},
+	"steps": [
+		{
+			"name": "forest-prep",
+			"raw": "0200000001adfcf841002f7d1331944ac8a5e35183cda63afe9acfcffff2f37f1ba90b58a4000000006441c95ad82f54afb6981de450eac030f630f14b6194840f53c1b5ba5abb9b0b4c2d00756f56127d8783006530326a5c2a5b7ced60ab2c25501a501d1bad9ff1904c612103d39fd02e479674c9a2e1db91b2936cc23460bd724eee0c1b98f34999a0253d30feffffff01c9b40e00000000001976a914ea97fe51eed2406f6c8be5002cae1aa83dbc53ea88ac00000000",
+			"txid": "0949e4d7094966ac9e0bedceb8cde8a92d2d53e79fd9efe6686376e640ea3401",
+			"state": "sent"
+		},
+		{
+			"name": "forest-genesis",
+			"raw": "02000000010134ea40e6766368e6efd99fe7532d2da9e8cdb8ceed0b9eac664909d7e449090000000064415c10961582883a1fa9053405e84f4524b82bf6ffc888d542eca460e1ce1c5bd633678ab55d33d9baa0266ff38062bce42bf6f3cc34db3a9b94f6b2c2f161a918612103d39fd02e479674c9a2e1db91b2936cc23460bd724eee0c1b98f34999a0253d30feffffff02e80300000000000045ef0134ea40e6766368e6efd99fe7532d2da9e8cdb8ceed0b9eac664909d7e4490922aa202e50557053a68b5170ad7249339a1eb8283be9a03fb478eb15fb8674bfe62be887f9ac0e00000000001976a914ea97fe51eed2406f6c8be5002cae1aa83dbc53ea88ac00000000",
+			"txid": "02986525728ea796f5031c1d9e4f6346b832919e4434cf59e8de45d168a5e3aa",
+			"state": "sent"
+		},
+		{
+			"name": "directory-prep",
+			"raw": "0200000001aae3a568d145dee859cf34449e9132b846634f9e1d1c03f596a78e7225659802010000006441ba2593301184031500ee8e08ea279e04b7449bbcdad4a8d301db6b55d60d717321db0ff7d4c9a5ca5ded9f5c4bffd71e76320a7e98a3712b59e7d2a6d6b658ab612103d39fd02e479674c9a2e1db91b2936cc23460bd724eee0c1b98f34999a0253d30feffffff0111a90e00000000001976a914ea97fe51eed2406f6c8be5002cae1aa83dbc53ea88ac00000000",
+			"txid": "9edee153596de9b8c370e728b9ded8696a9fa094e6f1a0ca8de2dd5d74b3ee8f",
+			"state": "sent"
+		},
+		{
+			"name": "directory-genesis",
+			"raw": "02000000018feeb3745ddde28dcaa0f1e694a09f6a69d8deb928e770c3b8e96d5953e1de9e000000006441ff9323e876cbcd4f1a3906aef1eb7741754c4be9cddb5da4f07d4cfb78bf24e7e95f10cc6dc4b59e508e6aeb996018d5afe7d9005a2aaacc4cd459087fee0175612103d39fd02e479674c9a2e1db91b2936cc23460bd724eee0c1b98f34999a0253d30feffffff02e80300000000000045ef8feeb3745ddde28dcaa0f1e694a09f6a69d8deb928e770c3b8e96d5953e1de9e22aa20bb5469c5327e0358a721272bbac62728dea042c2b272b140162a17948ce275d98741a10e00000000001976a914ea97fe51eed2406f6c8be5002cae1aa83dbc53ea88ac00000000",
+			"txid": "8e5b1860a54475a2e8022d0cc46b4420bf633d64b30523e9d7e0d488eebb7cdb",
+			"state": "sent"
+		}
+	],
+	"supersededBy": "deployments/mainnet.json (v2: same contracts, adds 100 creator trees at genesis)",
+	"status": "superseded"
+}

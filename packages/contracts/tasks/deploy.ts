@@ -6,6 +6,8 @@
  *   bun run deploy deploy    mint both minting batons into their contracts (once)
  *
  * Options: --network chipnet (default) | mainnet. Mainnet also requires FOCUS_GARDEN_CONFIRM_MAINNET=yes.
+ *          --creator-nfts <n> mints n creator trees in the Focus Forest genesis transaction itself
+ *          (no planting, no time lock), sent to --creator-address (default: the deployer wallet).
  * The deployment record (public data only) is written to packages/contracts/deployments/<network>.json
  * before anything is broadcast; a rerun resends the same signed bytes and never builds a second set.
  */
@@ -17,11 +19,14 @@ import * as path from "node:path";
 import { ElectrumNetworkProvider, SignatureTemplate } from "cashscript";
 import forestArtifact from "../artifacts/FocusForest.artifact.js";
 import directoryArtifact from "../artifacts/FocusDirectory.artifact.js";
-import { planDeployment, type Step } from "../src/deploy/genesis.js";
+import { creatorCommitments, planDeployment, type Step } from "../src/deploy/genesis.js";
 
 type NetworkName = "chipnet" | "mainnet";
 const args = process.argv.slice(2);
 const command = args.find((arg) => !arg.startsWith("--")) ?? "status";
+const option = (name: string) => { const index = args.indexOf(name); return index >= 0 ? args[index + 1] : undefined; };
+const creatorCount = Number(option("--creator-nfts") ?? 0);
+if (!Number.isInteger(creatorCount) || creatorCount < 0 || creatorCount > 500) fail("--creator-nfts takes a whole number from 0 to 500.");
 const networkIndex = args.indexOf("--network");
 const network = (networkIndex >= 0 ? args[networkIndex + 1] : "chipnet") as NetworkName;
 if (network !== "chipnet" && network !== "mainnet") fail("Use --network chipnet or --network mainnet.");
@@ -41,6 +46,7 @@ interface Record {
 	createdAt: string;
 	artifacts: { forest: string; directory: string };
 	forest: ReturnType<typeof planDeployment>["forest"];
+	creator?: { address: string; count: number; commitments: string[] };
 	directory: ReturnType<typeof planDeployment>["directory"];
 	steps: (Step & { state: "signed" | "sent" })[];
 }
@@ -98,9 +104,12 @@ async function deploy(provider: ElectrumNetworkProvider) {
 	if (!record) {
 		const coins = (await provider.getUtxos(address)).filter((coin) => !coin.token);
 		const total = coins.reduce((sum, coin) => sum + coin.satoshis, 0n);
-		if (total < MINIMUM_SATOSHIS) fail(`The deployer has ${total} sats; send at least ${MINIMUM_SATOSHIS} to ${address}.`);
-		const plan = planDeployment(provider, signer, address, coins, { forest: forestArtifact, directory: directoryArtifact });
-		record = { schema: "focus-garden-deployment-v1", network, deployer: address, createdAt: new Date().toISOString(), artifacts: { forest: sha256(forestArtifact), directory: sha256(directoryArtifact) }, forest: plan.forest, directory: plan.directory, steps: plan.steps.map((step) => ({ ...step, state: "signed" as const })) };
+		const needed = MINIMUM_SATOSHIS + BigInt(creatorCount) * 1200n;
+		if (total < needed) fail(`The deployer has ${total} sats; send at least ${needed} to ${address}.`);
+		const creatorAddress = option("--creator-address") ?? address;
+		const creator = creatorCount ? { address: creatorAddress, commitments: creatorCommitments(creatorAddress, creatorCount, Math.floor(Date.now() / 1000)) } : undefined;
+		const plan = planDeployment(provider, signer, address, coins, { forest: forestArtifact, directory: directoryArtifact }, creator);
+		record = { schema: "focus-garden-deployment-v1", network, deployer: address, createdAt: new Date().toISOString(), artifacts: { forest: sha256(forestArtifact), directory: sha256(directoryArtifact) }, forest: plan.forest, ...(creator ? { creator: { address: creator.address, count: creatorCount, commitments: creator.commitments } } : {}), directory: plan.directory, steps: plan.steps.map((step) => ({ ...step, state: "signed" as const })) };
 		// Persist before broadcasting so an interrupted run resends these exact bytes.
 		writeRecord(record);
 	} else if (record.artifacts.forest !== sha256(forestArtifact) || record.artifacts.directory !== sha256(directoryArtifact)) {
@@ -128,7 +137,9 @@ function printResult(record: Record) {
 	console.log(`EXPO_PUBLIC_GARDEN_CONTRACT_BYTECODE=${record.forest.lockingBytecode}`);
 	console.log(`EXPO_PUBLIC_GARDEN_DIRECTORY_CATEGORY=${record.directory.category}`);
 	console.log(`EXPO_PUBLIC_GARDEN_DIRECTORY_BYTECODE=${record.directory.lockingBytecode}`);
-	console.log(`\nFocus Forest contract:    ${record.forest.address}\nFocus Directory contract: ${record.directory.address}\n`);
+	console.log(`\nFocus Forest contract:    ${record.forest.address}\nFocus Directory contract: ${record.directory.address}`);
+	if (record.creator) console.log(`Creator NFTs:             ${record.creator.count} trees minted to ${record.creator.address} (genesis ${record.steps[1].txid})`);
+	console.log("");
 }
 
 const provider = new ElectrumNetworkProvider(network);

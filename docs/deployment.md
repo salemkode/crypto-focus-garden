@@ -69,9 +69,13 @@ The landing page reads the public deployment record (`packages/contracts/deploym
 
 ## 4. Mainnet deployment (19 November 2026)
 
+The live collection is **v2**: same contracts as v1, created again so its genesis transaction could mint the creator trees.
+
 | | Category | Contract address |
 |---|---|---|
-| Focus Forest | `0949e4d7094966ac9e0bedceb8cde8a92d2d53e79fd9efe6686376e640ea3401` | `bitcoincash:pvh9q4ts2wngk5ts44eyjvu6r6uzswlf5qlmg78tzhacva9luc47se32m43xj` |
-| Focus Directory | `9edee153596de9b8c370e728b9ded8696a9fa094e6f1a0ca8de2dd5d74b3ee8f` | `bitcoincash:pwa4g6w9xflqxk98yynjhwkxyu5dagzzc2e89v2qzc4p09yvuf6aje3m0fs2u` |
+| Focus Forest | `cd98a853ba5fa2758b773667d7a24dc75aad9b0e44d5fff860155377b67e04e1` | `bitcoincash:pwqv2hk4m9hs2n5lvsylsdymadt5cy8wvcjmxst3fyxmvpud705hg5pp2mugf` |
+| Focus Directory | `4bd83509d94f2013aaa576729be83b0287ac0df62c9ca56ae1c6b45629c65a06` | `bitcoincash:pvheta4rag6qfza50rz8vvemy5jhfle8uy5prnjz52g6zqc9aqs37jsngq48k` |
 
-All four transactions are in `packages/contracts/deployments/mainnet.json`; each minting baton was verified on chain inside its contract. The deployer wallet keeps the unused funds.
+**Creator trees.** The Focus Forest genesis transaction (`e60e66507468691fc10fc79a3aaeef12564317fa146f4618408783a1165a496e`) minted 100 trees straight to the deployer wallet `bitcoincash:qr4f0lj3amfyqmmv30jsqt9wr25rm0znagfg22drch`, with no planting and no time lock: 16 Sprouts, 24 Trees, 30 Big trees and 30 Houses across all six styles. They use the normal tree format and are immutable, so they look and behave like claimed trees and can be sent to anyone. The leaderboard counts only trees planted through the contract, so they add no points. Command: `bun run deploy deploy --network mainnet --creator-nfts 100` (`--creator-address` picks another recipient).
+
+All transactions are in `packages/contracts/deployments/mainnet.json`; batons and creator trees were verified on chain. The first collection (v1, `deployments/mainnet-v1.json`) was never used and is superseded.
