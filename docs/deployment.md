@@ -61,7 +61,7 @@ Everything is hosted on Cloudflare (account "Salem.m.s2030@gmail.com's Account",
 | What | URL | Deploy |
 |---|---|---|
 | Landing page | https://focus.salemkode.com | `cd packages/landing && bun run build && cf deploy ./dist` (config: `packages/landing/cloudflare.config.ts`, Worker `focus-garden`) |
-| Web app (Expo web export) | https://focus-app.salemkode.com | `cd packages/mobile && npx expo export --platform web --output-dir dist-web`, then `cd ../../deploy/web-app && cf deploy ../../packages/mobile/dist-web` (Worker `focus-garden-app`, single-page-app fallback) |
+| Web app (Expo web export, shown as a phone on desktop) | https://focus-app.salemkode.com | `cd packages/mobile && bun run export:web`, then `cd ../../deploy/web-app && cf deploy ../../packages/mobile/dist-web` (Worker `focus-garden-app`, single-page-app fallback) |
 | iPhone | https://appdrop.app/d/prvhsh4gyx | `packages/mobile/scripts/appdrop.sh <next build number>` |
 | Android | https://appdrop.app/d/njfetdhs4s | `./gradlew assembleRelease` in `packages/mobile/android`, then `npx appdrop app-release.apk --update https://appdrop.app/d/njfetdhs4s` |
 

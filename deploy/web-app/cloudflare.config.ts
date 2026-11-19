@@ -1,5 +1,5 @@
 // Cloudflare deployment of the web app: an assets-only Worker serving the Expo web export.
-// From this folder: (cd ../../packages/mobile && npx expo export --platform web --output-dir dist-web) && cf deploy ../../packages/mobile/dist-web
+// From this folder: (cd ../../packages/mobile && bun run export:web) && cf deploy ../../packages/mobile/dist-web
 // A plain object: defineConfig from "cf/config" only adds types.
 export default {
 	worker: {

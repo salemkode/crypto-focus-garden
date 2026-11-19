@@ -10,3 +10,6 @@ modules/libauth-native/build/
 /build-appdrop
 modules/*/android/build/
 modules/*/android/.cxx/
+
+# Web export (bun run export:web)
+dist-web/
