@@ -1,199 +1,88 @@
 "use client";
-
-import type { IConnector, WcSignTransactionRequest } from "@bch-wc2/interfaces";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useWeb3ModalConnectorContext } from "@bch-wc2/web3modal-connector";
-import { decodeTransaction, hexToBin } from "@bitauth/libauth";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import ContractInfoModal from "@/components/ContractInfoModal";
-import FinishTransactionModal from "@/components/FinishTransactionModal";
-import ThreeScene from "@/components/ThreeScene";
-import { usePomodoro } from "@/hooks/usePomodoro";
-import WalletGuard from "@/components/WalletGuard";
 import type { BaseWallet } from "mainnet-js";
+import WalletGuard from "@/components/WalletGuard";
 import Background from "@/components/Background";
 import Header from "@/components/Header";
+import ThreeScene from "@/components/ThreeScene";
 import HUD from "@/components/HUD";
+import ContractInfoModal from "@/components/ContractInfoModal";
+import { usePomodoro } from "@/hooks/usePomodoro";
 
 export default function Home() {
-	return (
-		<WalletGuard>{(wallet) => <HomeContent wallet={wallet} />}</WalletGuard>
-	);
+	return <WalletGuard>{wallet => <Garden key={wallet.cashaddr} wallet={wallet} />}</WalletGuard>;
 }
-
-function HomeContent({ wallet }: { wallet: BaseWallet }) {
-	const { connector, address } = useWeb3ModalConnectorContext();
-	const showError = useCallback((message: string) => {
-		setError(message);
-		setTimeout(() => setError(""), 10000);
-	}, []);
-
-	const wrappedConnector = useMemo(
-		() =>
-			connector
-				? {
-						...connector,
-						signTransaction: async (options: WcSignTransactionRequest) => {
-							setShowFinishTransactionModal(true);
-							setFinishTransactionMessage(
-								options.userPrompt || "Sign transaction",
-							);
-							try {
-								if (typeof options.transaction === "string") {
-									options.transaction = decodeTransaction(
-										hexToBin(options.transaction),
-									);
-								}
-								const result = await connector.signTransaction(options);
-								return result;
-							} catch (e: any) {
-								console.error(e);
-								// @ts-ignore
-								showError(`Unable to sign transaction: ${e.message}`);
-							} finally {
-								setShowFinishTransactionModal(false);
-								setFinishTransactionMessage("");
-							}
-						},
-					}
-				: (undefined as IConnector | undefined),
-		[connector, showError],
-	);
-	// const wallet = useWallet(); // Provided by prop now
-	const { mintAndLock, claim, getTreeCount, contractAddress, categoryId } =
-		usePomodoro(wallet, wrappedConnector);
-
-	const [count, setCount] = useState<number>(0);
-	const [showFinishTransactionModal, setShowFinishTransactionModal] =
-		useState<boolean>(false);
-	const [showContractInfo, setShowContractInfo] = useState<boolean>(false);
-	const [finishTransactionMessage, setFinishTransactionMessage] =
-		useState<string>("");
-	const [error, setError] = useState<string>("");
-	const [info, setInfo] = useState<string>("");
-	const [timerDuration, setTimerDuration] = useState<number>(25 * 60); // Default 25 minutes
-	const [showClaimButton, setShowClaimButton] = useState<boolean>(false);
-	const [isClaiming, setIsClaiming] = useState<boolean>(false);
-
-	// New State for Flow
-	const [appReady, setAppReady] = useState(false);
-	const [isChecking, setIsChecking] = useState(false);
-	const [isMinting, setIsMinting] = useState(false);
-	const [statusMessage, setStatusMessage] = useState("");
-
-	const showInfo = useCallback((message: string) => {
-		setInfo(message);
-		setTimeout(() => setInfo(""), 10000);
-	}, []);
-
-	// Fetch tree count
+function Garden({ wallet }: { wallet: BaseWallet }) {
+	const { connector } = useWeb3ModalConnectorContext();
+	const { getGarden, mintAndLock, claim, contractAddress, categoryId } = usePomodoro(wallet, connector);
+	const [garden, setGarden] = useState<Awaited<ReturnType<typeof getGarden>>>({ trees: [], sessions: [] });
+	const [duration, setDuration] = useState(1536);
+	const [progress, setProgress] = useState<number | null>(null);
+	const transactionPending = useRef(false);
+	const [phase, setPhase] = useState<"loading" | "ready" | "signing" | "error">("loading");
+	const [message, setMessage] = useState("");
+	const [date, setDate] = useState("");
+	const [dateBy, setDateBy] = useState("plantedAt");
+	const [info, setInfo] = useState(false);
+	const refresh = useCallback(async () => {
+		const next = await getGarden();
+		if (transactionPending.current) return;
+		setGarden(next);
+		setPhase("ready");
+	}, [getGarden]);
 	useEffect(() => {
-		if (address) {
-			getTreeCount().then(setCount);
-		}
-	}, [address, getTreeCount]);
-
-	const handleWalletConnect = useCallback(async () => {
-		if (!address) return;
-
-		setIsChecking(true);
-		setStatusMessage("Checking your garden...");
-
+		const load = () => transactionPending.current ? undefined : refresh().catch(error => { setPhase("error"); setMessage(error instanceof Error ? error.message : "Could not load your garden"); });
+		load();
+		const interval = setInterval(load, 30000);
+		return () => clearInterval(interval);
+	}, [refresh]);
+	const session = garden.sessions[0];
+	const visibleTrees = garden.trees.filter(tree => !date || localDay(dateBy === "plantedAt" ? tree.plantedAt : tree.releaseAt) === date);
+	async function transact() {
+		if (transactionPending.current) return;
+		transactionPending.current = true;
+		setPhase("signing");
 		try {
-			setAppReady(true);
-		} catch (e: any) {
-			console.error("Error in initialization flow:", e);
-			showError(`Initialization failed: ${e.message}`);
+			if (session) {
+				await claim(session.commitment);
+				setMessage("Tree claimed. Your garden has grown.");
+			} else {
+				await mintAndLock(duration);
+				setMessage("Tree planted. The blockchain lock begins when it confirms.");
+			}
+			const next = await getGarden();
+			if (session ? next.sessions.some(s => s.commitment === session.commitment) : !next.sessions.length) {
+				throw new Error("Transaction sent; waiting for the network to index it. Refresh status before continuing.");
+			}
+			setGarden(next);
+			setPhase("ready");
+		} catch (error) {
+			setMessage(error instanceof Error ? error.message : "Transaction status is uncertain. Refresh before trying again.");
+			setPhase("error");
 		} finally {
-			setIsChecking(false);
-			setIsMinting(false);
-			setAppReady(true);
+			transactionPending.current = false;
 		}
-	}, [address, showError]);
-
-	// Trigger flow when address becomes available
-	useEffect(() => {
-		if (address && !appReady && !isChecking && !isMinting) {
-			handleWalletConnect();
-		}
-	}, [address, appReady, isChecking, isMinting, handleWalletConnect]);
-
-	// If app is not ready, show blank screen or connect button
-	if (!appReady) {
-		return (
-			<div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-900 text-white">
-				<div className="flex flex-col items-center gap-4">
-					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
-					<p className="text-lg font-medium text-emerald-200">
-						{statusMessage || "Initializing..."}
-					</p>
-				</div>
-			</div>
-		);
 	}
-
-	return (
-		<div className="relative h-screen w-screen overflow-hidden bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white font-sans">
-			<Background />
-
-			{/* Modals & Alerts */}
-			{showFinishTransactionModal && (
-				<FinishTransactionModal
-					onClose={() => setShowFinishTransactionModal(false)}
-					message={finishTransactionMessage}
-				/>
-			)}
-			{showContractInfo && (
-				<ContractInfoModal
-					onClose={() => setShowContractInfo(false)}
-					address={contractAddress}
-					categoryId={categoryId}
-				/>
-			)}
-			{(error.length > 0 || info.length > 0) && (
-				<div className="fixed z-50 top-24 left-1/2 transform -translate-x-1/2 flex flex-col items-center w-full max-w-md px-4">
-					{error.length > 0 && (
-						<button
-							type="button"
-							onClick={() => setError("")}
-							className="w-full mb-2 rounded-xl border border-red-500/30 bg-red-500/10 backdrop-blur-md px-6 py-4 text-red-200 shadow-lg cursor-pointer hover:bg-red-500/20 transition-colors text-left"
-						>
-							{error}
-						</button>
-					)}
-					{info.length > 0 && (
-						<div
-							onClick={() => setInfo("")}
-							className="w-full mb-2 rounded-xl border border-green-500/30 bg-green-500/10 backdrop-blur-md px-6 py-4 text-green-200 shadow-lg cursor-pointer hover:bg-green-500/20 transition-colors"
-						>
-							{info}
-						</div>
-					)}
-				</div>
-			)}
-
-			<Header />
-
-			{/* Main Stage (3D Scene) */}
-			<main className="absolute inset-0 z-0">
-				<ThreeScene number={count} className="w-full h-full" />
-			</main>
-
-			<HUD
-				timerDuration={timerDuration}
-				setTimerDuration={setTimerDuration}
-				showClaimButton={showClaimButton}
-				setShowClaimButton={setShowClaimButton}
-				isClaiming={isClaiming}
-				setIsClaiming={setIsClaiming}
-				setStatusMessage={setStatusMessage}
-				showInfo={showInfo}
-				showError={showError}
-				mintAndLock={mintAndLock}
-				claim={claim}
-				getTreeCount={getTreeCount}
-				setCount={setCount}
-				setShowContractInfo={setShowContractInfo}
-			/>
+	return <div className="relative h-dvh w-screen overflow-hidden text-ink font-sans">
+		<Background /><Header />
+		<main className="absolute inset-0"><ThreeScene number={visibleTrees.length} growth={date ? null : progress} className="h-full w-full" /></main>
+		<div className="absolute top-24 left-4 z-40 earth-card p-4 max-w-[calc(100%-2rem)] text-xs">
+			<div className="flex flex-wrap items-center gap-2">
+				<label>Garden by <select aria-label="Filter date type" value={dateBy} onChange={e => setDateBy(e.target.value)} className="rounded bg-white p-1"><option value="plantedAt">Planting day</option><option value="releaseAt">Estimated release day</option></select></label>
+				<input aria-label="Garden day" type="date" value={date} onChange={e => setDate(e.target.value)} className="rounded bg-white p-1" />
+				<button onClick={() => setDate("")} className="underline">All days</button>
+				<button onClick={() => setInfo(true)} className="underline">Contract</button>
+			</div>
+			<p className="mt-2">{visibleTrees.length} trees shown · Dates use your local timezone. Release dates are estimates.</p>
+			{date && !visibleTrees.length ? <p className="mt-1">No trees for this day.</p> : null}
 		</div>
-	);
+		{message ? <div role="status" className="absolute top-48 left-4 right-4 z-40 rounded-xl bg-paper p-3 text-sm max-w-xl">{message}{phase === "error" ? <button className="ml-3 underline" onClick={() => { setPhase("loading"); refresh().catch(() => setPhase("error")); }}>Refresh status</button> : null}</div> : null}
+		<HUD duration={duration} setDuration={setDuration} session={session} busy={phase === "signing"} ready={phase === "ready"} onPlant={transact} onClaim={transact} setProgress={setProgress} count={garden.trees.length} />
+		{info ? <ContractInfoModal address={contractAddress} categoryId={categoryId} onClose={() => setInfo(false)} /> : null}
+	</div>;
+}
+function localDay(timestamp: number) {
+	const date = new Date(timestamp);
+	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }

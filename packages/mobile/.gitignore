@@ -1,0 +1,12 @@
+.expo/
+dist/
+/ios/
+/android/
+.env.local
+modules/libauth-native/build/
+
+# Local iPhone (device) builds
+/build-device
+/build-appdrop
+modules/*/android/build/
+modules/*/android/.cxx/

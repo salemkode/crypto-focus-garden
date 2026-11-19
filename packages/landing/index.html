@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+	<title>Focus Garden: focus, and grow a forest you own</title>
+	<meta name="description" content="Every focus session grows a voxel tree. It lives on Bitcoin Cash, in your own wallet. No accounts, no servers." />
+	<meta name="theme-color" content="#F1F5EE" media="(prefers-color-scheme: light)" />
+	<meta name="theme-color" content="#0F1712" media="(prefers-color-scheme: dark)" />
+	<meta property="og:title" content="Focus Garden" />
+	<meta property="og:description" content="Focus, and grow a forest you own. Every tree lives on Bitcoin Cash, in your wallet." />
+	<meta property="og:image" content="/icon.png" />
+	<link rel="icon" href="./public/favicon.png" />
+	<link rel="apple-touch-icon" href="./public/icon.png" />
+	<link rel="preload" href="./public/fonts/varela-round-latin.woff2" as="font" type="font/woff2" crossorigin />
+	<link rel="preload" href="./public/fonts/nunito-sans-latin.woff2" as="font" type="font/woff2" crossorigin />
+	<link rel="stylesheet" href="./src/styles.css" />
+	<link rel="stylesheet" href="./src/leaderboard.css" />
+</head>
+<body>
+	<a class="skip" href="#main">Skip to content</a>
+
+	<header class="nav">
+		<div class="nav-inner clay">
+			<a class="brand" href="#top" aria-label="Focus Garden home">
+				<img src="./public/icon.png" alt="" width="36" height="36" />
+				<span>Focus Garden</span>
+			</a>
+			<nav aria-label="Sections">
+				<a href="#how">How it works</a>
+				<a href="#grow">Grow</a>
+				<a href="#merge">Merge</a>
+				<a href="#leaders">Leaderboard</a>
+				<a href="#faq">FAQ</a>
+			</nav>
+			<a class="button button-primary button-small" href="#download">Get the app</a>
+		</div>
+	</header>
+
+	<main id="main">
+		<!-- Hero: one message, then the product itself as the demo. -->
+		<section class="hero" id="top" aria-labelledby="hero-title">
+			<div class="hero-copy reveal">
+				<p class="pill"><span class="icon-inline" data-icon="leaf"></span>Free on the Bitcoin Cash test network</p>
+				<h1 id="hero-title">Focus, and grow a forest you&nbsp;own.</h1>
+				<p class="lead">Every focus session grows a voxel tree. It lives on Bitcoin Cash, in your wallet, not on our servers.</p>
+				<div class="downloads" data-downloads></div>
+			</div>
+			<figure class="hero-demo reveal">
+				<div class="hero-stage">
+					<canvas id="valley" aria-hidden="true"></canvas>
+					<div class="stage-skeleton" aria-hidden="true"></div>
+				</div>
+				<figcaption class="demo-bar clay">
+					<span class="demo-caption">A live valley from the app. Drag to explore.</span>
+					<span class="demo-controls">
+						<button class="round" type="button" data-valley-turn="-1" aria-label="Turn the valley left"><span data-icon="turn-left"></span></button>
+						<button class="round" type="button" data-valley-turn="1" aria-label="Turn the valley right"><span data-icon="turn-right"></span></button>
+						<button class="round" type="button" data-valley-pause aria-pressed="false" aria-label="Pause the valley"><span data-icon="pause"></span></button>
+					</span>
+				</figcaption>
+			</figure>
+		</section>
+
+		<!-- How it works: three steps on one growth line. -->
+		<section class="how" id="how" aria-labelledby="how-title">
+			<h2 id="how-title" class="reveal">From a session to a tree in your wallet.</h2>
+			<ol class="steps">
+				<li class="step clay reveal">
+					<span class="step-icon" data-icon="timer"></span>
+					<h3>Plant when you start</h3>
+					<p>Pick a length and press Plant. Your tree is minted on Bitcoin Cash and starts growing.</p>
+				</li>
+				<li class="step clay reveal">
+					<span class="step-icon step-icon-sun" data-icon="lock"></span>
+					<h3>The chain keeps time</h3>
+					<p>A Bitcoin Cash time lock holds the tree until the session has passed. Nobody can skip it, including us.</p>
+				</li>
+				<li class="step clay reveal">
+					<span class="step-icon" data-icon="wallet"></span>
+					<h3>Yours to keep</h3>
+					<p>The tree moves to your own wallet with its small deposit. Lose your phone and that wallet can still claim it.</p>
+				</li>
+			</ol>
+		</section>
+
+		<!-- Grow: interactive minutes to tier. -->
+		<section class="grow" id="grow" aria-labelledby="grow-title">
+			<div class="grow-layout">
+				<div class="grow-head reveal">
+					<h2 id="grow-title">More focus grows a bigger tree.</h2>
+					<p>Slide to pick a session and watch what it grows.</p>
+				</div>
+				<div class="grow-copy reveal">
+					<div class="minutes">
+						<label for="minutes" class="minutes-label">Session length</label>
+						<p class="minutes-value"><span data-minutes>30</span><small>min</small></p>
+						<input id="minutes" type="range" min="5" max="120" step="1" value="30" aria-describedby="minutes-result ladder-note" />
+						<p class="minutes-result" id="minutes-result" data-result aria-live="polite">grows a Tree</p>
+					</div>
+					<ol class="ladder" data-ladder aria-label="Session length needed for each tree">
+						<li><b>Sprout</b><span>8.5 min</span></li>
+						<li><b>Tree</b><span>25.6 min</span></li>
+						<li><b>Big tree</b><span>51.2 min</span></li>
+						<li><b>House</b><span>93.9 min</span></li>
+					</ol>
+					<p class="note" id="ladder-note">Bitcoin Cash time locks count in 512-second steps, so on-chain trees start at 8.5 minutes. Shorter sessions still grow in the app.</p>
+				</div>
+				<div class="grow-side reveal">
+					<div class="sky-card stage-card" tabindex="0" role="img" data-stage="tier" aria-label="The tree this session grows. Use the arrow keys to turn it.">
+						<canvas id="tier"></canvas>
+						<p class="tier-badge" data-tier-badge>Tree</p>
+						<span class="stage-turn">
+							<button class="round" type="button" data-turn="tier" data-dir="-1" aria-label="Turn the tree left"><span data-icon="turn-left"></span></button>
+							<button class="round" type="button" data-turn="tier" data-dir="1" aria-label="Turn the tree right"><span data-icon="turn-right"></span></button>
+						</span>
+					</div>
+					<fieldset class="species">
+						<legend>Tree style</legend>
+						<div class="chips" data-species></div>
+					</fieldset>
+				</div>
+			</div>
+		</section>
+
+		<!-- Merge: playground. -->
+		<section class="merge" id="merge" aria-labelledby="merge-title">
+			<div class="merge-panel clay reveal">
+				<div class="merge-head">
+					<h2 id="merge-title">Small trees grow into houses.</h2>
+					<p>Combine grown trees into the next size. Your focus score stays exactly the same.</p>
+				</div>
+				<div class="merge-copy">
+					<div class="recipes" role="radiogroup" aria-label="Merge recipe" data-recipes>
+						<button type="button" role="radio" aria-checked="true" data-recipe="0">3 sprouts into a tree</button>
+						<button type="button" role="radio" aria-checked="false" data-recipe="1">2 trees into a big tree</button>
+						<button type="button" role="radio" aria-checked="false" data-recipe="2">2 big trees into a house</button>
+					</div>
+					<div class="merge-actions">
+						<button class="button button-primary" type="button" data-merge>Merge</button>
+						<p class="score" aria-live="polite">Focus score <b data-score>3</b></p>
+					</div>
+				</div>
+				<div class="sky-card stage-card merge-stage" tabindex="0" role="img" data-stage="merge" aria-label="The trees being merged. Use the arrow keys to turn them.">
+					<canvas id="merge-canvas"></canvas>
+					<span class="stage-turn">
+						<button class="round" type="button" data-turn="merge" data-dir="-1" aria-label="Turn the trees left"><span data-icon="turn-left"></span></button>
+						<button class="round" type="button" data-turn="merge" data-dir="1" aria-label="Turn the trees right"><span data-icon="turn-right"></span></button>
+					</span>
+				</div>
+			</div>
+		</section>
+
+		<!-- Leaderboard: read live from the chain. -->
+		<section class="leaders" id="leaders" aria-labelledby="leaders-title">
+			<div class="leaders-layout">
+				<div class="leaders-copy reveal">
+					<h2 id="leaders-title">Who focused most.</h2>
+					<p>Every point is a tree the chain kept locked for the full session. This board is read live from Bitcoin Cash in your browser, so nobody can edit it, including us.</p>
+					<p>Claim a name in the app to appear here. Without a name, your trees stay private.</p>
+				</div>
+				<div class="leader-board clay reveal" data-leaderboard></div>
+			</div>
+		</section>
+
+		<!-- On-chain: the promise and the proof. -->
+		<section class="chain" id="chain" aria-labelledby="chain-title">
+			<div class="chain-panel reveal">
+				<div class="chain-copy">
+					<h2 id="chain-title">No servers. Just Bitcoin Cash.</h2>
+					<ul class="facts">
+						<li><span class="step-icon" data-icon="plant"></span><div><b>The app talks to the chain directly.</b> No account to create and nothing of yours on our computers.</div></li>
+						<li><span class="step-icon" data-icon="lock"></span><div><b>Two small contracts set the rules.</b> They check every tree, merge and claim, and nobody can change them.</div></li>
+						<li><span class="step-icon" data-icon="tree"></span><div><b>One shared forest.</b> Everyone's trees and profile cards come from the same contracts, so anyone can verify them.</div></li>
+					</ul>
+				</div>
+				<div class="contracts" data-contracts aria-live="polite"></div>
+			</div>
+		</section>
+
+		<!-- More: real screens from the app. -->
+		<section class="more" aria-labelledby="more-title">
+			<h2 id="more-title" class="reveal">Also in the app.</h2>
+			<div class="more-row">
+				<figure class="shot reveal">
+					<img src="./public/22-species.jpg" alt="Tree styles: Meadow oak, Ridge pine, Silver birch and Blossom cherry." width="482" height="1049" loading="lazy" decoding="async" />
+					<figcaption><b>Six tree styles.</b> Oak, cherry, pine, maple, birch and the Cash tree.</figcaption>
+				</figure>
+				<figure class="shot shot-raised reveal">
+					<img src="./public/10-focus.jpg" alt="The Focus screen: a floating voxel valley with a 25:36 timer and a Plant button." width="482" height="1049" loading="lazy" decoding="async" />
+					<figcaption><b>Your valley.</b> Every tree you grow finds its place on your island.</figcaption>
+				</figure>
+				<figure class="shot reveal">
+					<img src="./public/29b-merge.jpg" alt="The Merge workshop, showing the three merge recipes." width="482" height="1049" loading="lazy" decoding="async" />
+					<figcaption><b>Merge workshop.</b> See what you can combine at a glance.</figcaption>
+				</figure>
+			</div>
+			<ul class="extras reveal">
+				<li><span class="step-icon" data-icon="hourglass"></span><span><b>Block distracting apps</b> while a tree grows, with Screen Time on iPhone.</span></li>
+				<li><span class="step-icon" data-icon="leaf"></span><span><b>Public profile card</b> so friends can find you and send a tip.</span></li>
+			</ul>
+		</section>
+
+		<!-- FAQ -->
+		<section class="faq" id="faq" aria-labelledby="faq-title">
+			<h2 id="faq-title" class="reveal">Questions.</h2>
+			<div class="faq-list reveal">
+				<details class="clay">
+					<summary>Do I need to know anything about crypto?</summary>
+					<p>No. The app creates a small wallet for you on your phone. You only need a little BCH to pay network fees, and you can link a wallet you already use to receive your trees.</p>
+				</details>
+				<details class="clay">
+					<summary>What does a tree cost?</summary>
+					<p>A planting pays a tiny network fee plus a 1,000-satoshi deposit. The deposit stays with the tree and comes back to you when you claim it.</p>
+				</details>
+				<details class="clay">
+					<summary>Is my focus really verified?</summary>
+					<p>The chain verifies time, not attention: your tree stays locked for the full session. Pair it with app blocking to keep the time honest.</p>
+				</details>
+				<details class="clay">
+					<summary>What if I lose my phone?</summary>
+					<p>Back up your app wallet's recovery phrase. Your trees belong to your reward wallet, and that wallet can claim them on its own, even without the app.</p>
+				</details>
+				<details class="clay">
+					<summary>Does anyone run a server I depend on?</summary>
+					<p>No. The app reads and writes the blockchain through public Bitcoin Cash servers. If we disappeared tomorrow, your trees and the rules would still be there.</p>
+				</details>
+				<details class="clay">
+					<summary>Is this real money?</summary>
+					<p data-network-answer></p>
+				</details>
+			</div>
+		</section>
+
+		<!-- Final call to action -->
+		<section class="download" id="download" aria-labelledby="download-title">
+			<div class="download-panel reveal">
+				<img src="./public/icon.png" alt="" width="104" height="104" />
+				<h2 id="download-title">Start your forest.</h2>
+				<p>Your first sprout is 8.5 minutes away.</p>
+				<div class="downloads downloads-center" data-downloads></div>
+			</div>
+		</section>
+	</main>
+
+	<footer class="footer">
+		<p>Focus Garden <span data-network-footer></span></p>
+		<p><a href="#chain">Contracts</a><a href="#faq">FAQ</a></p>
+	</footer>
+
+	<script type="module" src="./src/main.ts"></script>
+</body>
+</html>

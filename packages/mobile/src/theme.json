@@ -1,0 +1,7 @@
+{
+  "sky": "#e4f1ef", "paper": "#fffef5", "ink": "#1d3a2a",
+  "muted": "#657b6d", "grass": "#4c763e", "leaf": "#b7d68a",
+  "soil": "#8e6241", "line": "#dce4d7", "berry": "#a14940",
+  "night": "#1d3a2a", "cloud": "#fffef5", "warning": "#a14940",
+  "sun": "#e9a917", "bch": "#0ac18e", "dirt": "#efe6cf"
+}

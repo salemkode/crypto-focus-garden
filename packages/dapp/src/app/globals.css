@@ -1,19 +1,156 @@
 @import "tailwindcss";
 
 :root {
-	--background: #ffffff;
-	--foreground: #171717;
+	--sky-top: #9fcbea;
+	--sky-mid: #c3e0f3;
+	--sky-bottom: #dcedf8;
+	--ink: #1d3a2a;
+	--paper: #fffdf4;
+	--grass: #7ccb45;
+	--grass-deep: #4c9a2a;
+	--soil: #8b5a33;
+	--clay: #cf7f3a;
+	--sand: #e0bd85;
 }
 
 @theme inline {
-	--color-background: var(--background);
-	--color-foreground: var(--foreground);
-	--font-sans: var(--font-geist-sans);
-	--font-mono: var(--font-geist-mono);
+	--color-ink: #1d3a2a;
+	--color-ink-soft: #55705f;
+	--color-paper: #fffdf4;
+	--color-grass: #7ccb45;
+	--color-grass-deep: #3f8a25;
+	--color-soil: #8b5a33;
+	--color-clay: #b9642a;
+	--color-sand: #f0e2bd;
+	--color-berry: #c23a2e;
+	--color-sun: #f6c431;
+	--font-sans: var(--font-body), ui-rounded, system-ui, sans-serif;
+	--font-display: var(--font-pixel), ui-monospace, monospace;
+	--font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
 body {
-	background: var(--background);
-	color: var(--foreground);
-	font-family: Arial, Helvetica, sans-serif;
+	background: var(--sky-bottom);
+	color: var(--ink);
+	font-family: var(--font-body), ui-rounded, system-ui, sans-serif;
+}
+
+@layer components {
+	.sky {
+		background:
+			radial-gradient(60% 45% at 78% 8%, rgb(255 255 255 / 0.55), transparent 70%),
+			linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 55%, var(--sky-bottom) 100%);
+	}
+
+	/* A slab cut from the island: turf on top, soil layers underneath. */
+	.earth-card {
+		background: var(--paper);
+		border-radius: 22px;
+		box-shadow:
+			inset 0 6px 0 var(--grass),
+			0 5px 0 var(--soil),
+			0 10px 0 var(--clay),
+			0 15px 0 var(--sand),
+			0 34px 40px -20px rgb(29 58 42 / 0.5);
+	}
+
+	/* Chunky button that sinks into its own edge when pressed. */
+	.block-btn {
+		--btn: var(--grass);
+		--btn-edge: var(--grass-deep);
+		--drop: 4px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		border-radius: 14px;
+		background: var(--btn);
+		color: var(--ink);
+		font-weight: 800;
+		line-height: 1;
+		white-space: nowrap;
+		box-shadow: 0 var(--drop) 0 var(--btn-edge);
+		transition:
+			transform 80ms ease-out,
+			box-shadow 80ms ease-out,
+			filter 150ms ease-out;
+	}
+	.block-btn:hover:not(:disabled) {
+		filter: brightness(1.06);
+	}
+	.block-btn:active:not(:disabled) {
+		transform: translateY(var(--drop));
+		box-shadow: 0 0 0 var(--btn-edge);
+	}
+	.block-btn:disabled {
+		cursor: not-allowed;
+		filter: saturate(0.55);
+		opacity: 0.7;
+	}
+	.block-btn:focus-visible {
+		outline: 3px solid var(--ink);
+		outline-offset: 3px;
+	}
+	.block-btn--sand {
+		--btn: #f0e2bd;
+		--btn-edge: #cdb07a;
+	}
+	.block-btn--clay {
+		--btn: #f4b77f;
+		--btn-edge: var(--clay);
+	}
+	.block-btn--sun {
+		--btn: #ffd95a;
+		--btn-edge: #d79f1a;
+	}
+	.block-btn--ink {
+		--btn: var(--ink);
+		--btn-edge: #0d2014;
+		color: var(--paper);
+	}
+	.block-btn--sm {
+		--drop: 3px;
+		border-radius: 10px;
+	}
+	.block-btn--wait {
+		cursor: wait !important;
+	}
+
+	.pixel-art {
+		image-rendering: pixelated;
+		shape-rendering: crispEdges;
+	}
+}
+
+@keyframes sprout-hop {
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-8px);
+	}
+}
+.sprout-hop {
+	animation: sprout-hop 900ms steps(4, end) infinite;
+}
+
+@keyframes toast-in {
+	from {
+		opacity: 0;
+		transform: translateY(-8px);
+	}
+}
+.toast-in {
+	animation: toast-in 220ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.sprout-hop,
+	.toast-in {
+		animation: none;
+	}
+	.block-btn {
+		transition: none;
+	}
 }

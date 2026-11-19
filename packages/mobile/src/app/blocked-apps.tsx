@@ -1,0 +1,100 @@
+import { useEffect, useMemo, useState } from 'react';
+import { router } from 'expo-router';
+import { ActivityIndicator, FlatList, Image, Platform, Pressable, Switch, Text, TextInput, View } from 'react-native';
+import { FocusShield, SHIELD_ROW_HEIGHT, ShieldSelectionList, type LaunchableApp } from 'focus-shield';
+import { useFocusGarden } from '../features/focus/FocusProvider';
+import { useShield } from '../features/shield/useShield';
+import { Button, color, continuous, Group, Icon, icons, Notice, Row, Screen } from '../ui';
+
+export default function BlockedAppsScreen() {
+  return Platform.OS === 'ios' ? <ScreenTimeBlocking /> : <AndroidBlockList />;
+}
+
+/**
+ * iOS: Screen Time access and the chosen apps. The on/off switch lives in Focus rules. Apple's
+ * Screen Time picks and shields the apps; the chosen apps are drawn by iOS from opaque tokens, so
+ * Focus Garden never learns what they are.
+ */
+function ScreenTimeBlocking() {
+  const { garden } = useFocusGarden();
+  const growing = garden.timer.status === 'growing';
+  const shield = useShield();
+  const status = shield.status;
+  if (!status) return <View className="flex-1 items-center justify-center bg-canvas"><ActivityIndicator color={color.moss} /></View>;
+  const count = status.selectionCount;
+  return <Screen contentClassName="pt-4">
+    {!status.supported ? <Notice tone="warning">{status.pendingApproval
+      ? 'This copy of Focus Garden was built without Screen Time. Install a build with app blocking to use it.'
+      : 'App blocking needs an iPhone with iOS 16.4 or later.'}</Notice> : null}
+    {shield.error ? <Notice tone="error">{shield.error}</Notice> : null}
+    {growing ? <Notice>You can change blocked apps after this tree finishes.</Notice> : null}
+
+    {status.supported && !status.authorized ? <Group footer="Apple asks once. Focus Garden never sees your apps.">
+      <Row title="Allow Screen Time access" icon={icons.hourglass} iconTint={color.moss} onPress={shield.continueSetup} chevron />
+    </Group> : null}
+
+    {status.supported && status.authorized ? <Group title={count ? `Blocked during focus · ${count}` : undefined}
+      footer={count ? 'Pick categories like Social to cover new apps too.' : 'Pick apps, categories or websites.'}>
+      {count && ShieldSelectionList ? <View style={{ height: count * SHIELD_ROW_HEIGHT }}>
+        <ShieldSelectionList revision={shield.revision} style={{ flex: 1 }} />
+      </View> : null}
+      <Row title={count ? 'Edit blocked apps' : 'Choose apps to block'} icon={icons.apps} iconTint={color.ember} disabled={growing} onPress={shield.chooseApps} chevron />
+    </Group> : null}
+  </Screen>;
+}
+
+/** Android block list. iOS uses Apple's private picker instead and never lists apps. */
+function AndroidBlockList() {
+  const [apps, setApps] = useState<LaunchableApp[] | null>(null);
+  const [chosen, setChosen] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState('');
+  const [failed, setFailed] = useState<'load' | 'save' | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    Promise.all([FocusShield.listApps(), FocusShield.getBlockedPackages()])
+      .then(([list, blocked]) => { setApps(list); setChosen(new Set(blocked)); setFailed(null); })
+      .catch(() => { setApps([]); setFailed('load'); });
+  }, [attempt]);
+  const visible = useMemo(() => (apps ?? []).filter((app) => app.label.toLowerCase().includes(query.trim().toLowerCase())), [apps, query]);
+  function toggle(packageName: string) {
+    setChosen((current) => {
+      const next = new Set(current);
+      if (next.has(packageName)) next.delete(packageName); else next.add(packageName);
+      return next;
+    });
+  }
+  async function save() {
+    try {
+      await FocusShield.setBlockedPackages([...chosen]);
+      router.back();
+    } catch { setFailed('save'); }
+  }
+  if (!apps) return <View className="flex-1 items-center justify-center bg-canvas"><ActivityIndicator color={color.moss} /></View>;
+  return <View className="flex-1 bg-canvas">
+    <View className="px-4 pb-2 pt-4">
+      <View style={continuous} className="min-h-11 flex-row items-center gap-2 rounded-xl bg-sunk px-3">
+        <Icon name={icons.search} size={16} tint={color.ink3} />
+        <TextInput accessibilityLabel="Search apps" value={query} onChangeText={setQuery} placeholder="Search apps" placeholderTextColor={color.ink3} className="min-h-11 flex-1 text-body text-ink" />
+      </View>
+    </View>
+    <FlatList
+      data={visible}
+      keyExtractor={(app) => app.packageName}
+      contentContainerClassName="mx-4 my-2 overflow-hidden rounded-[20px] bg-surface"
+      ItemSeparatorComponent={() => <View className="ml-[60px] h-px bg-divider" />}
+      renderItem={({ item }) => <Pressable accessibilityRole="switch" accessibilityLabel={item.label} accessibilityState={{ checked: chosen.has(item.packageName) }} onPress={() => toggle(item.packageName)} className="min-h-14 flex-row items-center gap-3 px-4 py-2 active:bg-sunk">
+        {item.icon ? <Image source={{ uri: item.icon }} style={{ width: 32, height: 32, borderRadius: 8 }} /> : <View className="h-8 w-8 rounded-lg bg-sunk" />}
+        <Text numberOfLines={1} className="flex-1 text-body text-ink">{item.label}</Text>
+        <Switch importantForAccessibility="no" value={chosen.has(item.packageName)} onValueChange={() => toggle(item.packageName)} trackColor={{ true: color.moss, false: color.divider }} />
+      </Pressable>}
+      ListEmptyComponent={failed === 'load'
+        ? <View className="items-center gap-3 py-10"><Text className="text-body text-ink-2">{"Your apps didn't load."}</Text><Button variant="secondary" size="medium" label="Try again" onPress={() => { setApps(null); setAttempt((value) => value + 1); }} /></View>
+        : <Text className="py-10 text-center text-body text-ink-2">{query.trim() ? 'No apps match.' : 'No apps found.'}</Text>}
+    />
+    {/* After a failed load the list is empty, so saving would clear the saved choice: no save button then. */}
+    {failed === 'load' ? null : <View className="gap-3 bg-canvas px-4 pb-6 pt-3">
+      {failed === 'save' ? <Notice tone="error">{"Your blocked apps weren't saved. Try again."}</Notice> : null}
+      <Button label={`Block ${chosen.size} ${chosen.size === 1 ? 'app' : 'apps'}`} onPress={save} />
+    </View>}
+  </View>;
+}
