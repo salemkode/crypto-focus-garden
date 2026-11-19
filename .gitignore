@@ -145,3 +145,6 @@ packages/garden/prototype/ladder-embed.html
 
 # Swift Package Manager cache
 .build/
+
+# Cloudflare build output written by `cf deploy`
+.cloudflare/

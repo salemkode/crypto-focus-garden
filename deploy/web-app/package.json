@@ -1,0 +1,5 @@
+{
+	"name": "@focus-garden/web-app-deploy",
+	"private": true,
+	"type": "module"
+}
