@@ -1,5 +1,9 @@
 # Crypto Focus Garden
 
+> [!NOTE]
+> This is our 2025 hackathon submission, kept as it was submitted. The 2026 upgrade (the Focus
+> Garden mobile app) lives in [salemkode/focus-garden-next](https://github.com/salemkode/focus-garden-next).
+
 **Crypto Focus Garden** is a productivity game designed to gamify deep work in an era of constant distraction. The core concept is simple yet powerful: users earn a unique NFT tree for every successfully completed focus session.
 
 By turning productivity into a game where users compete to grow the largest forest, we aim to help people reclaim their attention span and achieve "flow" states more frequently.
