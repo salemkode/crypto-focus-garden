@@ -1,33 +1,21 @@
 {
-	"name": "@focus-garden/root",
+	"name": "@dapp-starter/root",
 	"private": true,
 	"version": "0.0.1",
 	"workspaces": [
+		"packages/contracts",
+		"packages/dapp",
 		"packages/*"
 	],
 	"license": "MIT",
-	"packageManager": "bun@1.4.4",
 	"scripts": {
 		"compile": "bun run --filter='*' compile",
-		"dev": "bun run mobile:start",
-		"build": "bun run --filter='*' compile",
-		"test": "bun run test:contracts && bun run test:protocol && bun run test:mobile",
-		"clean": "rm -rf packages/**/dist",
-		"mobile:start": "cd packages/mobile && bun run start",
-		"mobile:ios": "cd packages/mobile && bun run ios",
-		"mobile:android": "cd packages/mobile && bun run android",
-		"mobile:export": "cd packages/mobile && bun run export:check",
-		"typecheck:mobile": "cd packages/mobile && bun run typecheck",
-		"lint:mobile": "cd packages/mobile && bun run lint",
-		"test:mobile": "cd packages/mobile && bun run test",
-		"test:contracts": "cd packages/contracts && bun run test:pomodoro",
-		"test:native-core": "cd packages/mobile/modules/libauth-native && bun run test:host",
-		"check": "bun run typecheck:mobile && bun run typecheck:protocol && bun run lint:mobile && bun run --cwd packages/mobile check:valley && bun run test",
-		"test:protocol": "cd packages/protocol && bun run test",
-		"typecheck:protocol": "cd packages/protocol && bun run typecheck",
-		"contracts:deploy": "cd packages/contracts && bun run deploy",
-		"landing:dev": "cd packages/landing && bun run dev",
-		"landing:build": "cd packages/landing && bun run build"
+		"dev": "bun run --filter='*' dev",
+		"bump": "node bump_version.cjs",
+		"publish": "bun run --filter='*' publish:public",
+		"build": "bun run --filter='*' compile && cd packages/dapp && bun run build",
+		"test": "bun run --filter='*' test",
+		"clean": "rm -rf packages/**/dist"
 	},
 	"dependencies": {
 		"@bch-wc2/interfaces": "^0.0.16",
@@ -38,10 +26,5 @@
 	},
 	"devDependencies": {
 		"@types/node": "^24.10.1"
-	},
-	"patchedDependencies": {
-		"react-native-worklets-core@1.6.3": "patches/react-native-worklets-core@1.6.3.patch",
-		"react-native-filament@1.11.0": "patches/react-native-filament@1.11.0.patch",
-		"react-native-screens@4.30.1": "patches/react-native-screens@4.30.1.patch"
 	}
 }

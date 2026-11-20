@@ -72,10 +72,8 @@ export class PomodoroRewards {
 			);
 	}
 
-	async mintAndLockReward(duration = 1536, rewardAddress = this.wallet.tokenaddr) {
+	async mintAndLockReward() {
 		return mintAndLockReward({
-			duration,
-			rewardAddress,
 			wallet: this.wallet,
 			provider: this.contract.provider,
 			connector: this.connector,
