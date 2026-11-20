@@ -4,7 +4,9 @@ import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { publicWallet } from "./address";
 
-const keyName = "focusgarden.chipnet.internal.v1";
+/** Storage name kept from the Chipnet era so existing wallets stay reachable; the key works on any network. */
+export const INTERNAL_KEY_NAME = "focusgarden.chipnet.internal.v1";
+const keyName = INTERNAL_KEY_NAME;
 const options = {
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
 };

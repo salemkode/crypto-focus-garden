@@ -9,6 +9,7 @@ import { sampleRewardSessions, useSampleForest } from '../features/forest/sample
 import { useRewards } from '../features/rewards/RewardProvider';
 import { mergeableTrees } from '../services/garden';
 import { Arc, Button, color, continuous, Icon, icons, Notice, numerals, Screen, Stage } from '../ui';
+import { MONEY_NOTE } from '../services/network';
 
 const STEPS = FOREST_TIERS.filter((tier) => tier.mergeCount).map((tier) => ({ from: tier, to: FOREST_TIERS.find((next) => next.code === tier.code + 1)! }));
 
@@ -32,7 +33,7 @@ export default function MergeScreen() {
 
   function confirm(code: number, ingredients: string[], result: string, source: string) {
     void Haptics.selectionAsync();
-    Alert.alert(`Merge into a ${result.toLowerCase()}?`, `${ingredients.length} ${source.toLowerCase()}s become one ${result.toLowerCase()}, which shows up in Verified trees. Your verified focus score stays the same. This can't be undone.\n\nCost: a 2,000-sat network fee, in test coins with no cash value.`, [
+    Alert.alert(`Merge into a ${result.toLowerCase()}?`, `${ingredients.length} ${source.toLowerCase()}s become one ${result.toLowerCase()}, which shows up in Verified trees. Your verified focus score stays the same. This can't be undone.\n\nCost: a 2,000-sat network fee, ${MONEY_NOTE}.`, [
       { text: 'Not now', style: 'cancel' },
       { text: 'Merge', onPress: () => {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

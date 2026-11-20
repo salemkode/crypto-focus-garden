@@ -21,7 +21,7 @@ describe("native CashAddr boundary", () => {
     );
     if (typeof publicKey === "string") throw new Error(publicKey);
     const reference = encodeCashAddress({
-      prefix: "bchtest",
+      prefix: "bitcoincash",
       type: "p2pkh",
       payload: hash160(publicKey),
       throwErrors: true,
@@ -35,7 +35,7 @@ describe("native CashAddr boundary", () => {
   });
   test("accepts a token-aware external P2PKH address", () => {
     const result = encodeCashAddress({
-      prefix: "bchtest",
+      prefix: "bitcoincash",
       type: "p2pkhWithTokens",
       payload: hexToBytes("ab".repeat(20)),
       throwErrors: true,
@@ -59,13 +59,13 @@ describe("native CashAddr boundary", () => {
     ).toThrow();
     expect(() =>
       parseRewardAddress(
-        addressFromPublicKey(hexToBytes(wallet.publicKey), "bitcoincash"),
+        addressFromPublicKey(hexToBytes(wallet.publicKey), "bchtest"),
       ),
     ).toThrow();
   });
   test("rejects script-hash addresses rather than sending to an unsupported script", () => {
     const address = encodeCashAddress({
-      prefix: "bchtest",
+      prefix: "bitcoincash",
       type: "p2sh",
       payload: hexToBytes("ab".repeat(20)),
       throwErrors: true,

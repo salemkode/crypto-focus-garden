@@ -9,12 +9,10 @@
 	"packageManager": "bun@1.4.4",
 	"scripts": {
 		"compile": "bun run --filter='*' compile",
-		"dev": "bun run dev:web",
-		"build": "bun run --filter='*' compile && cd packages/dapp && bun run build",
-		"test": "bun run test:contracts && bun run test:mobile && bun run test:service",
+		"dev": "bun run mobile:start",
+		"build": "bun run --filter='*' compile",
+		"test": "bun run test:contracts && bun run test:protocol && bun run test:mobile",
 		"clean": "rm -rf packages/**/dist",
-		"dev:web": "cd packages/dapp && bun run dev --port 3477",
-		"build:web": "cd packages/dapp && bun run build",
 		"mobile:start": "cd packages/mobile && bun run start",
 		"mobile:ios": "cd packages/mobile && bun run ios",
 		"mobile:android": "cd packages/mobile && bun run android",
@@ -24,10 +22,9 @@
 		"test:mobile": "cd packages/mobile && bun run test",
 		"test:contracts": "cd packages/contracts && bun run test:pomodoro",
 		"test:native-core": "cd packages/mobile/modules/libauth-native && bun run test:host",
-		"check": "bun run typecheck:mobile && bun run typecheck:service && bun run lint:mobile && bun run --cwd packages/mobile check:valley && bun run test",
-		"test:service": "cd packages/service && bun run test",
-		"typecheck:service": "cd packages/service && bun run typecheck",
-		"service:start": "cd packages/service && bun run start",
+		"check": "bun run typecheck:mobile && bun run typecheck:protocol && bun run lint:mobile && bun run --cwd packages/mobile check:valley && bun run test",
+		"test:protocol": "cd packages/protocol && bun run test",
+		"typecheck:protocol": "cd packages/protocol && bun run typecheck",
 		"contracts:deploy": "cd packages/contracts && bun run deploy",
 		"landing:dev": "cd packages/landing && bun run dev",
 		"landing:build": "cd packages/landing && bun run build"
@@ -44,6 +41,7 @@
 	},
 	"patchedDependencies": {
 		"react-native-worklets-core@1.6.3": "patches/react-native-worklets-core@1.6.3.patch",
-		"react-native-filament@1.11.0": "patches/react-native-filament@1.11.0.patch"
+		"react-native-filament@1.11.0": "patches/react-native-filament@1.11.0.patch",
+		"react-native-screens@4.30.1": "patches/react-native-screens@4.30.1.patch"
 	}
 }

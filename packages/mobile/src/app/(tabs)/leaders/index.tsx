@@ -30,7 +30,7 @@ export default function LeadersScreen() {
   const [refreshing, setRefreshing] = useState(false);
   /** Your own leaderboard entry, kept with the wallet it was read for so another wallet never shows it. */
   const [me, setMe] = useState<{ wallet: string; id: string; state: 'pending' | 'public' } | null>(null);
-  // The leaderboard is read through the Focus Garden wallet's service session.
+  // The leaderboard is computed on this phone from the contracts' history on Bitcoin Cash.
   const connected = rewards.data.state === 'connected';
   const useSamples = samples !== null && __DEV__;
   const wallet = connected ? rewards.account?.address : undefined;

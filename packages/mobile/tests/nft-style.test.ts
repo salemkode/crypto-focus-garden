@@ -60,7 +60,7 @@ test('each NFT gets a stable name, rarity and per-item seed', () => {
 });
 
 test('development samples are valid garden data', () => {
-  const sessions = gardenSchema.parse({ network: 'chipnet', creditSatoshis: 0, sessions: sampleRewardSessions(1_794_700_000_000) }).sessions;
+  const sessions = gardenSchema.parse({ network: 'mainnet', balanceSatoshis: 0, sessions: sampleRewardSessions(1_794_700_000_000) }).sessions;
   expect(forestTrees(sessions)).toHaveLength(13);
   expect(mergeableTrees(sessions)).toHaveLength(9);
   expect(sessions.filter((session) => session.state === 'locked')).toHaveLength(1);

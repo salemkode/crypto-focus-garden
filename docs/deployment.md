@@ -30,16 +30,7 @@ Safety:
 - Mainnet requires `--network mainnet` and `FOCUS_GARDEN_CONFIRM_MAINNET=yes`.
 - `packages/contracts/test/contract/Deploy.test.ts` checks the whole chain against BCH consensus rules and plants a tree with the resulting baton.
 
-When it finishes it prints the values every app build needs:
-
-```
-EXPO_PUBLIC_GARDEN_CATEGORY=...
-EXPO_PUBLIC_GARDEN_CONTRACT_BYTECODE=aa20...87
-EXPO_PUBLIC_GARDEN_DIRECTORY_CATEGORY=...
-EXPO_PUBLIC_GARDEN_DIRECTORY_BYTECODE=aa20...87
-```
-
-Commit `deployments/<network>.json` (it holds only public data) so the app, the landing page and any indexer use the same deployment. If the contracts change, that is a new deployment with new addresses.
+Commit `deployments/<network>.json` (it holds only public data). The app bundles it and checks its own compiled contracts against it at startup, so the app, the landing page and any indexer use the same deployment. `EXPO_PUBLIC_FOCUS_NETWORK` picks the record (`mainnet` by default). If the contracts change, that is a new deployment with new addresses.
 
 ## 2. The landing page
 

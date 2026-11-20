@@ -7,9 +7,7 @@ import { useRewards } from '../features/rewards/RewardProvider';
 import { rewardAddressOf } from '../features/forest/address';
 import { color, Group, icons, nativeAware, Notice, Row } from '../ui';
 
-const CREDIT = { plant: 'planting', claim: 'sending', merge: 'merging', register: 'the leaderboard' } as const;
-
-/** "bchtest:qq…abcdef": the network prefix, then the first 14 and last 6 characters of the address. */
+/** "bitcoincash:qq…abcdef": the network prefix, then the first 14 and last 6 characters of the address. */
 function shortAddress(address: string) {
   const [prefix, body] = address.includes(':') ? address.split(':') as [string, string] : ['', address];
   const shown = body.length > 22 ? `${body.slice(0, 14)}…${body.slice(-6)}` : body;
@@ -17,8 +15,8 @@ function shortAddress(address: string) {
 }
 
 /**
- * The single saved operation: explicit sign/submit, status check or same-bytes resubmission. Never automatic.
- * Shows one status row and the one next step; the other recovery options sit behind "More options".
+ * The one transaction that was signed but whose sending is not settled yet (the answer was lost).
+ * Only the same signed bytes can be sent again, and only by choice; checking settles it from the chain.
  * Failures are reported by the host screen's notice (`RewardNotice`, ember for failures).
  */
 export const PendingOperation = nativeAware(function PendingOperation() {
@@ -28,41 +26,29 @@ export const PendingOperation = nativeAware(function PendingOperation() {
   const saved = rewards.pending;
   if (!saved) return null;
   const intent = saved.intent;
-  const destination = intent?.action === 'plant' ? intent.rewardAddress
-    : intent?.action === 'claim' ? rewardAddressOf(parseTree(intent.commitment)!.ownerBytecode)
-    : intent?.action === 'merge' ? rewardAddressOf(parseTree(intent.commitments[0])!.ownerBytecode) : '';
-  const label = intent?.action === 'plant' ? 'Planting a tree'
-    : intent?.action === 'claim' ? 'Sending a tree to your wallet'
-    : intent?.action === 'merge' ? `Merging ${intent.commitments.length} trees`
-    : intent?.action === 'register' ? 'Joining the leaderboard'
-    : intent?.action === 'tip' ? 'Sending a tip'
-    : saved.creditAction ? `Getting fee credit for ${CREDIT[saved.creditAction]}` : 'Getting fee credit';
-  // What signing spends, in the same words as the confirmations elsewhere (fees from the service's fixed policy).
-  const cost = intent?.action === 'tip' ? `${intent.amount.toLocaleString()} sats to them and a 2,000-sat network fee`
-    : intent?.action === 'plant' ? 'a 2,000-sat network fee and a 1,000-sat deposit that stays with the tree' : 'a 2,000-sat network fee';
-  // One confirm before anything is signed or sent; the row and its guards are unchanged.
-  function confirmFinish() {
+  const destination = intent.action === 'plant' ? intent.rewardAddress
+    : intent.action === 'claim' ? rewardAddressOf(parseTree(intent.commitment)!.ownerBytecode)
+    : intent.action === 'merge' ? rewardAddressOf(parseTree(intent.commitments[0]!)!.ownerBytecode)
+    : intent.action === 'tip' ? intent.recipient : '';
+  const label = intent.action === 'plant' ? 'Planting a tree'
+    : intent.action === 'claim' ? 'Sending a tree to your wallet'
+    : intent.action === 'merge' ? `Merging ${intent.commitments.length} trees`
+    : intent.action === 'register' ? 'Joining the leaderboard' : 'Sending a tip';
+  function confirmResend() {
     void Haptics.selectionAsync();
-    Alert.alert(saved!.raw ? 'Submit this transaction?' : 'Sign and submit?', `${label}. Your Focus Garden wallet ${saved!.raw ? 'sends the transaction it already signed' : 'signs the saved transaction and sends it'} to Bitcoin Cash. ${destination ? `Goes to ${shortAddress(destination)}. ` : ''}Cost: ${cost}, in test coins with no cash value.`, [
+    Alert.alert('Send it again?', `${label}. Your Focus Garden wallet sends the exact transaction it already signed; it can only go through once. ${destination ? `Goes to ${shortAddress(destination)}.` : ''}`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: saved!.raw ? 'Submit' : 'Sign and submit', onPress: () => void rewards.transact({ action: 'finish' }) },
+      { text: 'Send again', onPress: () => void rewards.transact({ action: 'rebroadcast' }) },
     ]);
   }
-  // Same rows and guards as before. "Sign and submit" is only shown when it can ever be enabled (it needs an id and an intent).
-  const next = !saved.id ? 'resume' : intent ? 'finish' : 'check';
-  const resume = <Row title="Resume the same request" disabled={!enabled} onPress={() => rewards.transact({ action: 'resume' })} chevron />;
-  const finish = <Row title={saved.raw ? 'Submit saved transaction' : 'Sign and submit saved transaction'} disabled={!enabled || !saved.intent || !saved.id} onPress={confirmFinish} chevron />;
-  const check = <Row title="Check status" disabled={!enabled} onPress={() => rewards.transact({ action: 'recover' })} chevron />;
-  const rebroadcast = <Row title="Resubmit the same signed transaction" disabled={!enabled} onPress={() => rewards.transact({ action: 'rebroadcast' })} chevron />;
   return <Group title="Unfinished transaction" footer="Nothing is sent again unless you choose it here.">
-    <Row title={label} detail={rewards.status === 'busy' ? 'Working on it…' : 'Not finished yet'} icon={icons.clock} iconTint={color.ink2} />
-    {next === 'resume' ? resume : next === 'finish' ? finish : check}
-    {/* Before signing, where the tree goes is always in view, not behind More options. */}
-    {next === 'finish' && destination ? <Row title="Goes to" detail={destination} /> : null}
+    <Row title={label} detail={rewards.status === 'busy' ? 'Working on it…' : 'Not confirmed as sent yet'} icon={icons.clock} iconTint={color.ink2} />
+    <Row title="Check status" disabled={!enabled} onPress={() => rewards.transact({ action: 'recover' })} chevron />
     <Row title={more ? 'Fewer options' : 'More options'} onPress={() => setMore(!more)} chevron={!more} />
-    {more && next !== 'check' ? check : null}
-    {more && saved.id ? rebroadcast : null}
-    {more && destination && next !== 'finish' ? <Row title="Goes to" detail={destination} /> : null}
+    {more ? <Row title="Send the same transaction again" disabled={!enabled} onPress={confirmResend} chevron /> : null}
+    {more && destination ? <Row title="Goes to" detail={destination} /> : null}
+    {more ? <Row title="Transaction" detail={saved.txid} trailingIcon={icons.copy} accessibilityLabel="Transaction ID. Copy"
+      onPress={() => { void Clipboard.setStringAsync(saved.txid); void Haptics.selectionAsync(); }} /> : null}
   </Group>;
 });
 
@@ -72,15 +58,10 @@ export const PendingOperation = nativeAware(function PendingOperation() {
  */
 const OUTCOMES: Record<string, { text: string; tone: 'info' | 'warning' | 'error' }> = {
   'No saved operation on this device.': { text: 'Nothing is unfinished on this phone.', tone: 'info' },
-  'Transaction credit is already available.': { text: 'You already have enough fee credit.', tone: 'info' },
-  'Transaction prepared. Review the saved destination, then sign and submit.': { text: 'Ready to sign. Check where it goes, then sign and submit.', tone: 'info' },
-  'The node has observed the transaction. Waiting for the required confirmations.': { text: 'Sent to Bitcoin Cash. It is confirming now.', tone: 'info' },
-  'Saved operation completed. Refresh the garden for its current network status.': { text: 'Done. Refresh to see the latest status.', tone: 'info' },
+  'Sent to Bitcoin Cash.': { text: 'Sent to Bitcoin Cash. It is confirming now.', tone: 'info' },
+  'Saved operation completed. Refresh the garden for its current network status.': { text: 'Done. It is on Bitcoin Cash.', tone: 'info' },
+  'That transaction can no longer go through, so it was cleared. Nothing was spent by it.': { text: 'That transaction can no longer go through, so it was cleared. Nothing was spent by it.', tone: 'info' },
   'Wallet linked. Trees planted before keep their original destination.': { text: 'Wallet linked. Trees planted before still go to the wallet they were planted for.', tone: 'info' },
-  'Service access saved securely. Refresh your garden to verify this app wallet.': { text: 'Access key saved. Refresh to check your Focus Garden wallet.', tone: 'info' },
-  // Failures with a fix in the app: say where it is.
-  'Transaction credit is required.': { text: 'You need fee credit first. Get it under Fees in Verified trees.', tone: 'error' },
-  'Save your service access token in Wallet first.': { text: 'Add your garden access key first, in Profile under Advanced.', tone: 'error' },
   'Submission is unresolved. Check saved status; no replacement will be sent automatically.': { text: "It isn't clear yet whether this was sent. Check status; nothing is sent again on its own.", tone: 'warning' },
 };
 

@@ -1,5 +1,7 @@
 # Focus Forest v5: rewards that grow with focus, a public directory, a leaderboard and tips
 
+> **Historical.** The garden service (`packages/service`) and its BCHN node described below were removed. The app now builds, signs and broadcasts every transaction itself and reads the chain through public Electrum servers; see `packages/protocol/src/build.ts`, `chain.ts` and `garden.ts`.
+
 Status (15 November 2026): implemented and tested locally. **Not deployed.** It supersedes v4 (docs/focus-forest-v4.md), which was never deployed either, so nothing migrates.
 
 ## Product rules (user-directed)

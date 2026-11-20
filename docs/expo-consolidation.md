@@ -1,10 +1,12 @@
 # Focus Garden + Expo consolidation
 
+> **Historical.** The garden service (`packages/service`) and its BCHN node described below were removed. The app now builds, signs and broadcasts every transaction itself and reads the chain through public Electrum servers; see `packages/protocol/src/build.ts`, `chain.ts` and `garden.ts`.
+
 Snapshot: 15 November 2026. Branch: `feat/unify-focus-garden-expo`. The user explicitly requested one software project; no commit, push, PR merge, deployment or financial transaction was performed.
 
 ## Canonical architecture
 
-- `packages/dapp`: original Next.js web garden and web contract integration.
+- `packages/dapp`: original Next.js web garden and web contract integration (removed on 19 November 2026; the landing page and the Expo web app replace it).
 - `packages/contracts`: authoritative v3 CashScript covenant and credit policy. Its external recipient is fixed at planting; actual relative lock enforcement remains on-chain.
 - `packages/mobile`: **one** Expo SDK 58 / React Native 0.88 / Expo Router application. The previous SDK 54 shell has been replaced, not kept as another runtime.
 - `packages/garden`: original voxel island/tree/sapling models shared by both web and mobile. Web uses Three.js WebGL; mobile uses Expo GL/Three. No WebView or unrelated native checkerboard substitutes for the original garden.
@@ -82,4 +84,4 @@ Validate startup/rendering and wallet restoration on an owned development device
 
 ## Subsequent funding/signing work
 
-The consolidation results above are its checkpoint, not verification of later edits. The subsequent service/native-v3 work is owned by the main implementation task and documented in [funding-service.md](funding-service.md). Code for authenticated credit, preparation, local full-transaction validation/signing and recovery now exists. Deployment, financial acceptance and owned-device QA remain unperformed.
+The consolidation results above are its checkpoint, not verification of later edits. The subsequent service/native-v3 work is owned by the main implementation task and documented in the (since removed) service doc. Code for authenticated credit, preparation, local full-transaction validation/signing and recovery now exists. Deployment, financial acceptance and owned-device QA remain unperformed.

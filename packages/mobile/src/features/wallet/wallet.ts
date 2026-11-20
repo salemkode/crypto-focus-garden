@@ -9,7 +9,9 @@ import Storage from 'expo-sqlite/kv-store';
 import { recoveryPhraseSchema, WalletInitializationError } from './mnemonic';
 import { readStoredWalletIdentity, walletAddressCacheKey } from './identity';
 import { restoreStoredWallet } from './restore';
+import { NETWORK, PREFIX } from '../../services/network';
 
+/** Storage name kept from the Chipnet era so existing wallets stay reachable; the phrase works on any network. */
 const mnemonicKey = 'focus-garden-chipnet-mnemonic-v1';
 
 async function initializeWallet(create = false) {
@@ -17,7 +19,8 @@ async function initializeWallet(create = false) {
   if (!saved && !create) throw new WalletInitializationError({ message: 'The existing XO vault is unavailable. No replacement wallet was created.' });
   const mnemonic = recoveryPhraseSchema.parse(saved ?? generateBip39Mnemonic());
   if (!saved) await SecureStore.setItemAsync(mnemonicKey, mnemonic, { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY });
-  const engine = await Engine.create(mnemonic, { network: 'chipnet', databasePath: './focus-garden', databaseFilename: 'FocusGarden' });
+  // Each network keeps its own wallet database; Chipnet keeps the original one.
+  const engine = await Engine.create(mnemonic, { network: NETWORK, databasePath: './focus-garden', databaseFilename: NETWORK === 'chipnet' ? 'FocusGarden' : `FocusGarden-${NETWORK}` });
   const { templateIdentifier } = await engine.importTemplate(p2pkhTemplate);
   await engine.setWalletName('Focus Garden');
   await engine.setDefaultPolicies({ receive: { templateIdentifier }, change: { templateIdentifier } });
@@ -27,12 +30,12 @@ async function initializeWallet(create = false) {
   const savedAddress = Storage.getItemSync(addressKey);
   const address = savedAddress ?? assertSuccess(lockingBytecodeToCashAddress({
     bytecode: hexToBin(await engine.generateLockingBytecodeFromDefaultPolicy('receive')),
-    prefix: 'bchtest',
+    prefix: PREFIX,
   })).address;
   Storage.setItemSync(addressKey, address);
   const decoded = cashAddressToLockingBytecode(address);
   if (typeof decoded === 'string') throw new WalletInitializationError({ message: decoded });
-  const crypto = new Crypto(convertMnemonicToSeedBytes(mnemonic), { network: 'testnet' });
+  const crypto = new Crypto(convertMnemonicToSeedBytes(mnemonic), { network: NETWORK === 'mainnet' ? 'mainnet' : 'testnet' });
   async function signP2pkh(context: CompilationContextBch) {
     const source = context.sourceOutputs[context.inputIndex];
     if (!source) throw new WalletInitializationError({ message: 'Transaction is missing its source output.' });
