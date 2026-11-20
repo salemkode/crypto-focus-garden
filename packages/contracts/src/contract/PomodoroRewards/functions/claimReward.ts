@@ -1,4 +1,4 @@
-import { hexToBin, lockingBytecodeToCashAddress } from "@bitauth/libauth";
+import { WrapBuilder } from "@bch-wc2/cashscript-signer";
 import type { IConnector } from "@bch-wc2/interfaces";
 import {
 	type Contract,
@@ -8,7 +8,8 @@ import {
 } from "cashscript";
 import type { BaseWallet } from "mainnet-js";
 import type PomodoroRewardsArtifact from "../../../../artifacts/PomodoroRewards.artifact.js";
-import { validateUtxo, toTokenAddress } from "../../../utils.js";
+import { changeEndianness } from "../deploy.js";
+import { validateUtxo } from "../../../utils.js";
 
 export const claimReward = async ({
 	wallet,
@@ -24,9 +25,11 @@ export const claimReward = async ({
 	contract: Contract<typeof PomodoroRewardsArtifact>;
 	categoryId: string;
 	nftCommitment: string;
-}) => {
-	if (!/^03[0-9a-f]{58}(03|06)$/i.test(nftCommitment)) throw new Error("Legacy or invalid session: recover through the original contract");
-	const units = parseInt(nftCommitment.slice(-2), 16);
+}): Promise<{
+	[key: string]: unknown;
+}> => {
+	// Get current block timestamp for locktime (matching mintAndLockReward logic)
+	const locktime = await wallet.provider.getBlockHeight();
 
 	// Get contract UTXOs
 	const contractUtxos = await contract
@@ -48,8 +51,7 @@ export const claimReward = async ({
 	// Get user UTXOs for funding
 	const userUtxos = await wallet.getUtxos().then((e) => e.map(validateUtxo));
 	const nonTokenUtxos = userUtxos
-		.filter((utxo) => !utxo.token && utxo.satoshis >= 4000n)
-		.slice(0, 1)
+		.filter((utxo) => !utxo.token && utxo.satoshis >= 2000n)
 		.map((utxo) => ({
 			...utxo,
 			satoshis: BigInt(utxo.satoshis),
@@ -60,16 +62,14 @@ export const claimReward = async ({
 		throw new Error("No available non-token UTXOs found for fees");
 	}
 
-	const destination = lockingBytecodeToCashAddress({ bytecode: hexToBin(nftCommitment.slice(2, 52)), prefix: provider.network === "mainnet" ? "bitcoincash" : "bchtest" });
-	if (typeof destination === "string") throw new Error(destination);
-	const address = toTokenAddress(destination.address);
+	const address = wallet.tokenaddr;
 
 	const builder = new TransactionBuilder({ provider });
 	const placeholderUnlocker = placeholderP2PKHUnlocker(wallet.tokenaddr);
 
 	// Add input with unlocker
 	builder
-		.addInput(lockedUtxo, contract.unlock.claimReward(), { sequence: 4194304 + units })
+		.addInput(lockedUtxo, contract.unlock.claimReward())
 		.addInputs(nonTokenUtxos, placeholderUnlocker)
 		.addOutput({
 			to: address,
@@ -82,7 +82,8 @@ export const claimReward = async ({
 					commitment: nftCommitment, // Pass commitment to output
 				},
 			},
-		});
+		})
+		.setLocktime(locktime); // Use block timestamp
 
 	// Add change output if there's enough BCH
 	const totalBchAmount = nonTokenUtxos.reduce(
@@ -96,15 +97,14 @@ export const claimReward = async ({
 		});
 	}
 
-	const result = await connector.signTransaction(builder.generateWcTransactionObject({
+	const result = await WrapBuilder(builder as any, connector).send({
 		userPrompt: "Claim Reward",
 		broadcast: false,
-	}));
-	if (!result) throw new Error("Wallet did not sign the transaction");
+	});
 
 	await provider.sendRawTransaction(result.signedTransaction);
 
 	return {
-		txid: result.signedTransactionHash,
+		txid: result.txid,
 	};
 };

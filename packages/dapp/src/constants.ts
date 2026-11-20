@@ -1,0 +1,5 @@
+if (!process.env.NEXT_PUBLIC_POMODORO_CATEGORY_ID) {
+	throw new Error("NEXT_PUBLIC_POMODORO_CATEGORY_ID is not set");
+}
+export const POMODORO_CATEGORY_ID =
+	process.env.NEXT_PUBLIC_POMODORO_CATEGORY_ID;
